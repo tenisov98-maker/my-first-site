@@ -1013,13 +1013,13 @@
       addLine("ИМЯ", client.name);
       addLine("НОМЕР", client.phone);
       addLine("АДРЕС", client.address);
-      if (hasValue(client.m2)) addLine("ПЛОЩАДЬ", `${String(client.m2).trim()} м2`);
+      if (hasValue(client.m2)) addLine("ПЛОЩАДЬ", `${String(client.m2).trim()}м2`);
       addLine("ТИП ОБЪЕКТА", client.objectType);
       addLine("ТИП РЕМОНТА", client.repairType);
       addLine("ОТДЕЛКА", client.finishType);
       addLine("ОТ КОГО", client.source);
       addLine("КОММЕНТАРИЙ", getLastCommentText(client));
-      return lines.join("\n");
+      return lines.join("\n \n");
     }
 
     async function copyClientCard() {
