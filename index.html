@@ -1,0 +1,1572 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CRM — клиенты и сделки</title>
+  <style>
+    :root {
+      --header: #0f2744;
+      --header-light: #1a3a5c;
+      --bg: #eef2f7;
+      --card: #ffffff;
+      --text: #1a2332;
+      --muted: #64748b;
+      --border: #e2e8f0;
+      --accent: #2563eb;
+      --success: #16a34a;
+      --danger: #dc2626;
+      --warning: #d97706;
+      --radius: 12px;
+      --shadow: 0 4px 24px rgba(15, 39, 68, 0.08);
+      --drawer-w: 440px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      line-height: 1.5;
+    }
+
+    body.drawer-open { overflow: hidden; }
+
+    .header {
+      background: linear-gradient(135deg, var(--header) 0%, var(--header-light) 100%);
+      color: #fff;
+      padding: 1.5rem 1.5rem 1.25rem;
+      box-shadow: 0 4px 20px rgba(15, 39, 68, 0.25);
+    }
+
+    .header-top {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      margin-bottom: 1.25rem;
+    }
+
+    .header h1 { font-size: 1.5rem; font-weight: 600; letter-spacing: -0.02em; }
+    .header p { font-size: 0.875rem; opacity: 0.85; margin-top: 0.15rem; }
+
+    .header-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center; }
+
+    .nav-back {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      padding: 0.5rem 1rem;
+      font-size: 0.875rem;
+      font-weight: 500;
+      color: #fff;
+      text-decoration: none;
+      border: 1px solid rgba(255, 255, 255, 0.35);
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.08);
+      transition: background 0.2s ease, border-color 0.2s ease;
+      white-space: nowrap;
+    }
+
+    .nav-back:hover {
+      background: rgba(255, 255, 255, 0.16);
+      border-color: rgba(255, 255, 255, 0.55);
+    }
+
+    .btn-export {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      padding: 0.5rem 1rem;
+      font-size: 0.875rem;
+      font-weight: 500;
+      color: #fff;
+      border: 1px solid rgba(255, 255, 255, 0.35);
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.08);
+      cursor: pointer;
+      font-family: inherit;
+      transition: background 0.2s ease, border-color 0.2s ease;
+      white-space: nowrap;
+    }
+
+    .btn-export:hover {
+      background: rgba(255, 255, 255, 0.16);
+      border-color: rgba(255, 255, 255, 0.55);
+    }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 0.75rem;
+    }
+
+    .stat {
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: var(--radius);
+      padding: 0.85rem 1rem;
+    }
+
+    .stat-label {
+      font-size: 0.75rem;
+      opacity: 0.8;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .stat-value { font-size: 1.5rem; font-weight: 700; margin-top: 0.2rem; }
+
+    .main { max-width: 1200px; margin: 0 auto; padding: 1.5rem; }
+
+    .tabs { display: flex; gap: 0.5rem; margin-bottom: 1.25rem; }
+
+    .tab {
+      padding: 0.6rem 1.1rem;
+      border: none;
+      border-radius: 999px;
+      background: var(--card);
+      color: var(--muted);
+      font-family: inherit;
+      font-size: 0.9rem;
+      font-weight: 500;
+      cursor: pointer;
+      box-shadow: var(--shadow);
+      transition: background 0.2s, color 0.2s;
+    }
+
+    .tab.active { background: var(--header); color: #fff; }
+
+    .panel { display: none; }
+    .panel.active { display: block; }
+
+    .card {
+      background: var(--card);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 1.25rem;
+      margin-bottom: 1rem;
+      border: 1px solid var(--border);
+    }
+
+    .card-title { font-size: 1rem; font-weight: 600; margin-bottom: 1rem; }
+
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      margin-bottom: 1rem;
+      align-items: flex-end;
+    }
+
+    .field {
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+      flex: 1;
+      min-width: 130px;
+    }
+
+    .field label { font-size: 0.75rem; font-weight: 500; color: var(--muted); }
+
+    input, select, textarea {
+      font-family: inherit;
+      font-size: 0.9rem;
+      padding: 0.55rem 0.75rem;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: #fff;
+      color: var(--text);
+    }
+
+    input:focus, select:focus, textarea:focus {
+      outline: 2px solid var(--accent);
+      outline-offset: 0;
+      border-color: var(--accent);
+    }
+
+    .btn {
+      font-family: inherit;
+      font-size: 0.875rem;
+      font-weight: 500;
+      padding: 0.55rem 1rem;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: opacity 0.2s, transform 0.15s;
+    }
+
+    .btn:hover { opacity: 0.92; transform: translateY(-1px); }
+    .btn-primary { background: var(--accent); color: #fff; }
+    .btn-danger { background: var(--danger); color: #fff; }
+    .btn-success { background: var(--success); color: #fff; }
+    .btn-ghost {
+      background: transparent;
+      color: var(--muted);
+      border: 1px solid var(--border);
+    }
+    .btn-sm { padding: 0.35rem 0.65rem; font-size: 0.8rem; }
+
+    .client-list { display: flex; flex-direction: column; gap: 0.65rem; }
+
+    .client-item {
+      display: grid;
+      grid-template-columns: 1fr auto auto;
+      gap: 0.75rem;
+      align-items: center;
+      padding: 0.85rem 1rem;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: #fafbfc;
+      cursor: pointer;
+      transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
+    }
+
+    .client-item:hover {
+      border-color: #93c5fd;
+      background: #fff;
+      box-shadow: 0 4px 16px rgba(37, 99, 235, 0.12);
+    }
+
+    .client-item.active {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2);
+      background: #fff;
+    }
+
+    @media (max-width: 640px) {
+      .client-item { grid-template-columns: 1fr; }
+    }
+
+    .client-name { font-weight: 600; }
+    .client-meta { font-size: 0.8rem; color: var(--muted); margin-top: 0.15rem; }
+
+    .badge {
+      display: inline-block;
+      font-size: 0.7rem;
+      font-weight: 600;
+      padding: 0.25rem 0.55rem;
+      border-radius: 999px;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+
+    .badge-new { background: #dbeafe; color: #1d4ed8; }
+    .badge-active { background: #dcfce7; color: #15803d; }
+    .badge-done { background: #f1f5f9; color: #475569; }
+
+    .client-actions { display: flex; gap: 0.4rem; flex-wrap: wrap; }
+
+    .funnel {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 0.75rem;
+      min-height: 320px;
+    }
+
+    @media (max-width: 1100px) { .funnel { grid-template-columns: repeat(3, 1fr); } }
+    @media (max-width: 700px) { .funnel { grid-template-columns: 1fr 1fr; } }
+    @media (max-width: 440px) { .funnel { grid-template-columns: 1fr; } }
+
+    .funnel-col {
+      background: #f8fafc;
+      border: 1px dashed var(--border);
+      border-radius: var(--radius);
+      padding: 0.75rem;
+      min-height: 200px;
+    }
+
+    .funnel-col h3 {
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 0.65rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 2px solid var(--border);
+    }
+
+    .funnel-col[data-stage="lead"] h3 { border-color: #93c5fd; color: #1d4ed8; }
+    .funnel-col[data-stage="contact"] h3 { border-color: #fcd34d; color: #b45309; }
+    .funnel-col[data-stage="proposal"] h3 { border-color: #c4b5fd; color: #6d28d9; }
+    .funnel-col[data-stage="won"] h3 { border-color: #86efac; color: #15803d; }
+    .funnel-col[data-stage="lost"] h3 { border-color: #fca5a5; color: #b91c1c; }
+
+    .deal-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0.65rem 0.75rem;
+      margin-bottom: 0.5rem;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+    }
+
+    .funnel-col[data-stage="lost"] .deal-card {
+      background: #fff5f5;
+      border-color: #fecaca;
+      opacity: 0.8;
+    }
+
+    .deal-card strong { font-size: 0.9rem; display: block; }
+    .deal-card span { font-size: 0.75rem; color: var(--muted); }
+    .deal-amount { font-weight: 700; color: var(--success); font-size: 0.85rem; margin-top: 0.35rem; }
+    .funnel-col[data-stage="lost"] .deal-amount { color: var(--danger); }
+    .deal-move { margin-top: 0.5rem; width: 100%; font-size: 0.75rem; }
+
+    .empty { font-size: 0.85rem; color: var(--muted); text-align: center; padding: 1.5rem; }
+
+    /* Боковая панель клиента */
+    .drawer-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 39, 68, 0.4);
+      z-index: 150;
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.25s ease, visibility 0.25s;
+    }
+
+    .drawer-backdrop.open {
+      opacity: 1;
+      visibility: visible;
+    }
+
+    .drawer {
+      position: fixed;
+      top: 0;
+      right: 0;
+      width: min(var(--drawer-w), 100vw);
+      height: 100vh;
+      background: var(--card);
+      z-index: 160;
+      box-shadow: -8px 0 40px rgba(15, 39, 68, 0.15);
+      transform: translateX(100%);
+      transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+      display: flex;
+      flex-direction: column;
+    }
+
+    .drawer.open { transform: translateX(0); }
+
+    .drawer-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 1rem;
+      padding: 1.25rem 1.25rem 1rem;
+      border-bottom: 1px solid var(--border);
+      background: linear-gradient(180deg, #f8fafc 0%, #fff 100%);
+    }
+
+    .drawer-header-left { display: flex; flex-direction: column; gap: 0.35rem; flex: 1; min-width: 0; }
+    .drawer-header h2 {
+      font-size: 1.2rem;
+      font-weight: 600;
+      line-height: 1.3;
+      word-break: break-word;
+    }
+    .drawer-header-actions { display: flex; gap: 0.35rem; flex-wrap: wrap; }
+
+    .drawer-close {
+      width: 36px;
+      height: 36px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: #fff;
+      font-size: 1.1rem;
+      cursor: pointer;
+      color: var(--muted);
+      flex-shrink: 0;
+      transition: background 0.2s, color 0.2s;
+    }
+
+    .drawer-close:hover {
+      background: var(--header);
+      color: #fff;
+      border-color: var(--header);
+    }
+
+    .drawer-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 1.25rem;
+    }
+
+    .detail-grid {
+      display: grid;
+      gap: 0.85rem;
+      margin-bottom: 1.5rem;
+    }
+
+    /* Edit mode in drawer */
+    .edit-form { display: none; margin-bottom: 1.5rem; }
+    .edit-form.visible { display: block; }
+    .view-mode.hidden { display: none; }
+
+    .edit-form .field { margin-bottom: 0.65rem; min-width: 0; }
+    .edit-form .field label { font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); display: block; margin-bottom: 0.25rem; }
+    .edit-form input, .edit-form select { width: 100%; }
+    .edit-form-actions { display: flex; gap: 0.5rem; margin-top: 0.75rem; }
+    .edit-form-actions .btn { flex: 1; }
+
+    .detail-row label {
+      display: block;
+      font-size: 0.7rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--muted);
+      margin-bottom: 0.2rem;
+    }
+
+    .detail-row p {
+      font-size: 0.95rem;
+      word-break: break-word;
+    }
+
+    .detail-row a { color: var(--accent); text-decoration: none; }
+    .detail-row a:hover { text-decoration: underline; }
+
+    .drawer-section-title {
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--muted);
+      margin-bottom: 0.75rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 1px solid var(--border);
+    }
+
+    /* Сделки клиента в drawer */
+    .client-deals-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .client-deal-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.55rem 0.75rem;
+      background: #f8fafc;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      font-size: 0.85rem;
+    }
+
+    .client-deal-title { font-weight: 500; }
+    .client-deal-meta { font-size: 0.75rem; color: var(--muted); }
+    .client-deal-amount { font-weight: 600; color: var(--success); font-size: 0.8rem; white-space: nowrap; margin-left: 0.5rem; }
+
+    .stage-pill {
+      font-size: 0.65rem;
+      font-weight: 600;
+      padding: 0.15rem 0.45rem;
+      border-radius: 999px;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+      margin-left: 0.4rem;
+      white-space: nowrap;
+    }
+    .stage-lead { background: #dbeafe; color: #1d4ed8; }
+    .stage-contact { background: #fef3c7; color: #b45309; }
+    .stage-proposal { background: #ede9fe; color: #6d28d9; }
+    .stage-won { background: #dcfce7; color: #15803d; }
+    .stage-lost { background: #fee2e2; color: #b91c1c; }
+
+    .comments-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      margin-bottom: 1rem;
+      max-height: 280px;
+      overflow-y: auto;
+    }
+
+    .comment-item {
+      padding: 0.7rem 0.8rem;
+      background: #f8fafc;
+      border-radius: 8px;
+      border-left: 3px solid var(--accent);
+      position: relative;
+    }
+
+    .comment-date { font-size: 0.7rem; color: var(--muted); margin-bottom: 0.25rem; }
+    .comment-text { font-size: 0.9rem; padding-right: 1.5rem; }
+
+    .comment-delete {
+      position: absolute;
+      top: 0.5rem;
+      right: 0.5rem;
+      width: 22px;
+      height: 22px;
+      border: none;
+      border-radius: 4px;
+      background: transparent;
+      color: var(--muted);
+      font-size: 0.8rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.15s, color 0.15s;
+    }
+
+    .comment-delete:hover { background: #fee2e2; color: var(--danger); }
+
+    .comment-form textarea { width: 100%; resize: vertical; min-height: 72px; }
+    .comment-form .btn { width: 100%; margin-top: 0.5rem; }
+
+    .toast {
+      position: fixed;
+      bottom: 1.5rem;
+      right: 1.5rem;
+      background: var(--header);
+      color: #fff;
+      padding: 0.75rem 1.25rem;
+      border-radius: 8px;
+      font-size: 0.875rem;
+      opacity: 0;
+      transform: translateY(10px);
+      transition: opacity 0.3s, transform 0.3s;
+      z-index: 200;
+      pointer-events: none;
+      max-width: 300px;
+    }
+
+    .toast.show { opacity: 1; transform: translateY(0); }
+  </style>
+</head>
+<body>
+  <header class="header">
+    <div class="header-top">
+      <div>
+        <h1>CRM</h1>
+        <p>Клиенты, воронка сделок и комментарии</p>
+      </div>
+      <div class="header-actions">
+        <button type="button" class="btn-export" id="btn-export-csv">⬇ Экспорт CSV</button>
+        <a class="nav-back" href="index.html">← Назад</a>
+      </div>
+    </div>
+    <div class="stats" id="stats">
+      <div class="stat">
+        <div class="stat-label">Клиентов</div>
+        <div class="stat-value" id="stat-clients">0</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">Сделок</div>
+        <div class="stat-value" id="stat-deals">0</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">Выиграно</div>
+        <div class="stat-value" id="stat-won">0 ₽</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">Проиграно</div>
+        <div class="stat-value" id="stat-lost">0 ₽</div>
+      </div>
+    </div>
+  </header>
+
+  <main class="main">
+    <nav class="tabs">
+      <button type="button" class="tab active" data-tab="clients">Клиенты</button>
+      <button type="button" class="tab" data-tab="funnel">Воронка</button>
+    </nav>
+
+    <section class="panel active" id="panel-clients">
+      <div class="card">
+        <h2 class="card-title">Добавить клиента</h2>
+        <form id="client-form" class="toolbar">
+          <div class="field">
+            <label for="client-name">Имя</label>
+            <input type="text" id="client-name" placeholder="Иван Петров" required>
+          </div>
+          <div class="field">
+            <label for="client-company">Компания</label>
+            <input type="text" id="client-company" placeholder="ООО Ромашка">
+          </div>
+          <div class="field">
+            <label for="client-phone">Телефон</label>
+            <input type="tel" id="client-phone" placeholder="+7 999 000-00-00">
+          </div>
+          <div class="field">
+            <label for="client-email">Email</label>
+            <input type="email" id="client-email" placeholder="mail@example.com">
+          </div>
+          <div class="field">
+            <label for="client-status">Статус</label>
+            <select id="client-status">
+              <option value="new">Новый</option>
+              <option value="active">Активный</option>
+              <option value="done">Завершён</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="client-source">Источник</label>
+            <select id="client-source">
+              <option value="">—</option>
+              <option value="Профи.ру">Профи.ру</option>
+              <option value="Авито">Авито</option>
+              <option value="Рекомендация">Рекомендация</option>
+              <option value="Другое">Другое</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="client-city">Город</label>
+            <input type="text" id="client-city" placeholder="Москва">
+          </div>
+          <div class="field" style="flex: 2;">
+            <label for="client-address">Адрес</label>
+            <input type="text" id="client-address" placeholder="ул. Пушкина, д. 10">
+          </div>
+          <div class="field">
+            <label for="client-object-type">Тип объекта</label>
+            <select id="client-object-type">
+              <option value="">—</option>
+              <option value="Новостройка">Новостройка</option>
+              <option value="Вторичка">Вторичка</option>
+              <option value="Частный дом">Частный дом</option>
+              <option value="Коммерция">Коммерция</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="client-repair-type">Тип ремонта</label>
+            <select id="client-repair-type">
+              <option value="">—</option>
+              <option value="Капитальный">Капитальный</option>
+              <option value="Косметический">Косметический</option>
+              <option value="Дизайнерский">Дизайнерский</option>
+              <option value="Под ключ">Под ключ</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="client-finish-type">Тип отделки</label>
+            <select id="client-finish-type">
+              <option value="">—</option>
+              <option value="Бетон">Бетон</option>
+              <option value="Предчистовая">Предчистовая</option>
+              <option value="Чистовая">Чистовая</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="client-m2">М2</label>
+            <input type="number" id="client-m2" min="0" step="0.1" placeholder="65">
+          </div>
+          <div class="field">
+            <label for="client-order-number">Номер заказа</label>
+            <input type="text" id="client-order-number" placeholder="ORD-00124">
+          </div>
+          <div class="field">
+            <label for="client-meeting-date">Дата встречи</label>
+            <input type="date" id="client-meeting-date">
+          </div>
+          <button type="submit" class="btn btn-primary">Добавить</button>
+        </form>
+      </div>
+
+      <div class="card">
+        <h2 class="card-title">Список клиентов</h2>
+        <p style="font-size:0.8rem;color:var(--muted);margin:-0.5rem 0 1rem;">Нажмите на карточку, чтобы открыть детали и редактировать</p>
+        <div class="toolbar">
+          <div class="field" style="flex: 2;">
+            <label for="search-clients">Поиск</label>
+            <input type="search" id="search-clients" placeholder="Имя, компания, email, телефон...">
+          </div>
+          <div class="field">
+            <label for="filter-status">Статус</label>
+            <select id="filter-status">
+              <option value="">Все</option>
+              <option value="new">Новый</option>
+              <option value="active">Активный</option>
+              <option value="done">Завершён</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="sort-clients">Сортировка</label>
+            <select id="sort-clients">
+              <option value="date-desc">Сначала новые</option>
+              <option value="date-asc">Сначала старые</option>
+              <option value="name-asc">По имени А–Я</option>
+              <option value="name-desc">По имени Я–А</option>
+              <option value="status">По статусу</option>
+            </select>
+          </div>
+        </div>
+        <div class="client-list" id="client-list"></div>
+        <p class="empty" id="clients-empty" style="display:none;">Клиентов пока нет. Добавьте первого выше.</p>
+      </div>
+    </section>
+
+    <section class="panel" id="panel-funnel">
+      <div class="card">
+        <h2 class="card-title">Новая сделка</h2>
+        <form id="deal-form" class="toolbar">
+          <div class="field" style="flex: 2;">
+            <label for="deal-title">Название</label>
+            <input type="text" id="deal-title" placeholder="Поставка оборудования" required>
+          </div>
+          <div class="field">
+            <label for="deal-client">Клиент</label>
+            <select id="deal-client" required></select>
+          </div>
+          <div class="field">
+            <label for="deal-amount">Сумма, ₽</label>
+            <input type="number" id="deal-amount" min="0" step="1000" value="0" required>
+          </div>
+          <button type="submit" class="btn btn-primary">В воронку</button>
+        </form>
+      </div>
+
+      <div class="funnel" id="funnel">
+        <div class="funnel-col" data-stage="lead">
+          <h3>Лид</h3>
+          <div class="deals" data-stage="lead"></div>
+        </div>
+        <div class="funnel-col" data-stage="contact">
+          <h3>Контакт</h3>
+          <div class="deals" data-stage="contact"></div>
+        </div>
+        <div class="funnel-col" data-stage="proposal">
+          <h3>Предложение</h3>
+          <div class="deals" data-stage="proposal"></div>
+        </div>
+        <div class="funnel-col" data-stage="won">
+          <h3>Выигран</h3>
+          <div class="deals" data-stage="won"></div>
+        </div>
+        <div class="funnel-col" data-stage="lost">
+          <h3>Проигран</h3>
+          <div class="deals" data-stage="lost"></div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <div class="drawer-backdrop" id="drawer-backdrop" aria-hidden="true"></div>
+  <aside class="drawer" id="client-drawer" aria-hidden="true">
+    <div class="drawer-header">
+      <div class="drawer-header-left">
+        <h2 id="drawer-title">Клиент</h2>
+        <div class="drawer-header-actions">
+          <button type="button" class="btn btn-ghost btn-sm" id="btn-copy-client-card">📋 Скопировать карточку</button>
+          <button type="button" class="btn btn-ghost btn-sm" id="btn-edit-client">✏ Редактировать</button>
+        </div>
+      </div>
+      <button type="button" class="drawer-close" id="drawer-close" aria-label="Закрыть">✕</button>
+    </div>
+    <div class="drawer-body">
+
+      <!-- Форма редактирования -->
+      <form class="edit-form" id="edit-client-form">
+        <div class="field">
+          <label for="edit-name">Имя</label>
+          <input type="text" id="edit-name" required>
+        </div>
+        <div class="field">
+          <label for="edit-company">Компания</label>
+          <input type="text" id="edit-company">
+        </div>
+        <div class="field">
+          <label for="edit-phone">Телефон</label>
+          <input type="tel" id="edit-phone">
+        </div>
+        <div class="field">
+          <label for="edit-email">Email</label>
+          <input type="email" id="edit-email">
+        </div>
+        <div class="field">
+          <label for="edit-status">Статус</label>
+          <select id="edit-status">
+            <option value="new">Новый</option>
+            <option value="active">Активный</option>
+            <option value="done">Завершён</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="edit-source">Источник</label>
+          <select id="edit-source">
+            <option value="">—</option>
+            <option value="Профи.ру">Профи.ру</option>
+            <option value="Авито">Авито</option>
+            <option value="Рекомендация">Рекомендация</option>
+            <option value="Другое">Другое</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="edit-city">Город</label>
+          <input type="text" id="edit-city">
+        </div>
+        <div class="field">
+          <label for="edit-address">Адрес</label>
+          <input type="text" id="edit-address">
+        </div>
+        <div class="field">
+          <label for="edit-object-type">Тип объекта</label>
+          <select id="edit-object-type">
+            <option value="">—</option>
+            <option value="Новостройка">Новостройка</option>
+            <option value="Вторичка">Вторичка</option>
+            <option value="Частный дом">Частный дом</option>
+            <option value="Коммерция">Коммерция</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="edit-repair-type">Тип ремонта</label>
+          <select id="edit-repair-type">
+            <option value="">—</option>
+            <option value="Капитальный">Капитальный</option>
+            <option value="Косметический">Косметический</option>
+            <option value="Дизайнерский">Дизайнерский</option>
+            <option value="Под ключ">Под ключ</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="edit-finish-type">Тип отделки</label>
+          <select id="edit-finish-type">
+            <option value="">—</option>
+            <option value="Бетон">Бетон</option>
+            <option value="Предчистовая">Предчистовая</option>
+            <option value="Чистовая">Чистовая</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="edit-m2">М2</label>
+          <input type="number" id="edit-m2" min="0" step="0.1">
+        </div>
+        <div class="field">
+          <label for="edit-order-number">Номер заказа</label>
+          <input type="text" id="edit-order-number">
+        </div>
+        <div class="field">
+          <label for="edit-meeting-date">Дата встречи</label>
+          <input type="date" id="edit-meeting-date">
+        </div>
+        <div class="edit-form-actions">
+          <button type="submit" class="btn btn-primary">Сохранить</button>
+          <button type="button" class="btn btn-ghost" id="btn-cancel-edit">Отмена</button>
+        </div>
+      </form>
+
+      <!-- Просмотр данных -->
+      <div class="view-mode" id="view-mode">
+        <div class="detail-grid" id="drawer-details"></div>
+
+        <h3 class="drawer-section-title">Сделки</h3>
+        <div class="client-deals-list" id="client-deals-list"></div>
+
+        <h3 class="drawer-section-title">Комментарии</h3>
+        <div class="comments-list" id="comments-list"></div>
+        <form class="comment-form" id="comment-form">
+          <div class="field">
+            <label for="comment-text">Новый комментарий</label>
+            <textarea id="comment-text" rows="3" placeholder="Запишите договорённости, итог звонка..." required></textarea>
+          </div>
+          <button type="submit" class="btn btn-primary">Добавить комментарий</button>
+        </form>
+      </div>
+
+    </div>
+  </aside>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    const STORAGE_KEY = "crm-data-v2";
+    const STAGES = [
+      { id: "lead", label: "Лид" },
+      { id: "contact", label: "Контакт" },
+      { id: "proposal", label: "Предложение" },
+      { id: "won", label: "Выигран" },
+      { id: "lost", label: "Проигран" }
+    ];
+    const STATUS_LABELS = { new: "Новый", active: "Активный", done: "Завершён" };
+    const STATUS_CLASS = { new: "badge-new", active: "badge-active", done: "badge-done" };
+    const STATUS_ORDER = { new: 0, active: 1, done: 2 };
+
+    let data = { clients: [], deals: [] };
+    let drawerClientId = null;
+    let editMode = false;
+
+    function uid() {
+      return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+    }
+
+    function migrateClients() {
+      data.clients.forEach(c => {
+        if (!c.company) c.company = "";
+        if (!c.phone) c.phone = "";
+        if (!c.comments) c.comments = c.notes || [];
+        if (!c.createdAt) c.createdAt = new Date().toISOString();
+        if (!c.source) c.source = "";
+        if (!c.city) c.city = "";
+        if (!c.address) c.address = "";
+        if (!c.objectType) c.objectType = "";
+        if (!c.repairType) c.repairType = "";
+        if (!c.finishType) c.finishType = "";
+        if (c.m2 === undefined || c.m2 === null) c.m2 = "";
+        if (!c.orderNumber) c.orderNumber = "";
+        if (!c.meetingDate) c.meetingDate = "";
+        delete c.notes;
+      });
+      data.deals.forEach(d => {
+        if (!STAGES.find(s => s.id === d.stage)) d.stage = "lead";
+      });
+    }
+
+    function load() {
+      try {
+        // Migrate from old key
+        const oldRaw = localStorage.getItem("crm-data-v1");
+        const newRaw = localStorage.getItem(STORAGE_KEY);
+        if (newRaw) {
+          data = JSON.parse(newRaw);
+        } else if (oldRaw) {
+          data = JSON.parse(oldRaw);
+        }
+      } catch (_) {
+        data = { clients: [], deals: [] };
+      }
+      migrateClients();
+    }
+
+    function save() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    }
+
+    function toast(msg, durationMs = 2200) {
+      const el = document.getElementById("toast");
+      el.textContent = msg;
+      el.classList.add("show");
+      setTimeout(() => el.classList.remove("show"), durationMs);
+    }
+
+    function formatMoney(n) {
+      return new Intl.NumberFormat("ru-RU", { style: "currency", currency: "RUB", maximumFractionDigits: 0 }).format(n);
+    }
+
+    function formatDate(iso) {
+      return new Date(iso).toLocaleString("ru-RU", {
+        day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit"
+      });
+    }
+
+    function formatDateShort(iso) {
+      return new Date(iso).toLocaleDateString("ru-RU", { day: "2-digit", month: "short", year: "numeric" });
+    }
+
+    function escapeHtml(s) {
+      if (s == null || s === "") return "";
+      const d = document.createElement("div");
+      d.textContent = String(s);
+      return d.innerHTML;
+    }
+
+    function displayVal(v) {
+      return v ? escapeHtml(v) : '<span style="color:var(--muted)">—</span>';
+    }
+
+    function updateStats() {
+      document.getElementById("stat-clients").textContent = data.clients.length;
+      document.getElementById("stat-deals").textContent = data.deals.length;
+      const wonSum = data.deals
+        .filter(d => d.stage === "won")
+        .reduce((s, d) => s + (Number(d.amount) || 0), 0);
+      const lostSum = data.deals
+        .filter(d => d.stage === "lost")
+        .reduce((s, d) => s + (Number(d.amount) || 0), 0);
+      document.getElementById("stat-won").textContent = formatMoney(wonSum);
+      document.getElementById("stat-lost").textContent = formatMoney(lostSum);
+    }
+
+    function getClient(id) {
+      return data.clients.find(c => c.id === id);
+    }
+
+    function hasValue(v) {
+      return v !== null && v !== undefined && String(v).trim() !== "";
+    }
+
+    function getLastCommentText(client) {
+      if (!client || !Array.isArray(client.comments) || !client.comments.length) return "";
+      const latest = client.comments
+        .slice()
+        .sort((a, b) => new Date(b.date) - new Date(a.date))[0];
+      return latest && hasValue(latest.text) ? latest.text.trim() : "";
+    }
+
+    function buildClientCardText(client) {
+      if (!client) return "";
+      const lines = [];
+      const addLine = (label, value) => {
+        if (hasValue(value)) lines.push(`${label} - ${String(value).trim()}`);
+      };
+
+      addLine("ИМЯ", client.name);
+      addLine("НОМЕР", client.phone);
+      addLine("АДРЕС", client.address);
+      if (hasValue(client.m2)) addLine("ПЛОЩАДЬ", `${String(client.m2).trim()} м2`);
+      addLine("ТИП ОБЪЕКТА", client.objectType);
+      addLine("ТИП РЕМОНТА", client.repairType);
+      addLine("ОТДЕЛКА", client.finishType);
+      addLine("ОТ КОГО", client.source);
+      addLine("КОММЕНТАРИЙ", getLastCommentText(client));
+      return lines.join("\n");
+    }
+
+    async function copyClientCard() {
+      const client = getClient(drawerClientId);
+      if (!client) return;
+      const text = buildClientCardText(client);
+      if (!text) {
+        toast("Нет данных для копирования");
+        return;
+      }
+
+      try {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          await navigator.clipboard.writeText(text);
+        } else {
+          const area = document.createElement("textarea");
+          area.value = text;
+          area.setAttribute("readonly", "");
+          area.style.position = "fixed";
+          area.style.left = "-9999px";
+          document.body.appendChild(area);
+          area.select();
+          document.execCommand("copy");
+          document.body.removeChild(area);
+        }
+        toast("Скопировано!", 2000);
+      } catch (_) {
+        toast("Не удалось скопировать");
+      }
+    }
+
+    function clientSearchText(c) {
+      return [
+        c.name,
+        c.company,
+        c.email,
+        c.phone,
+        c.city,
+        c.address,
+        c.objectType,
+        c.repairType,
+        c.finishType,
+        c.source,
+        c.orderNumber
+      ].filter(Boolean).join(" ").toLowerCase();
+    }
+
+    function setEditMode(on) {
+      editMode = on;
+      document.getElementById("edit-client-form").classList.toggle("visible", on);
+      document.getElementById("view-mode").classList.toggle("hidden", on);
+      document.getElementById("btn-edit-client").textContent = on ? "↩ Назад" : "✏ Редактировать";
+    }
+
+    function openDrawer(clientId) {
+      const client = getClient(clientId);
+      if (!client) return;
+      drawerClientId = clientId;
+      if (!client.comments) client.comments = [];
+
+      document.getElementById("drawer-title").textContent = client.name;
+
+      setEditMode(false);
+      refreshDrawerDetails();
+      renderComments();
+      renderClientDeals();
+      document.getElementById("comment-text").value = "";
+
+      document.getElementById("drawer-backdrop").classList.add("open");
+      document.getElementById("client-drawer").classList.add("open");
+      document.body.classList.add("drawer-open");
+
+      document.querySelectorAll(".client-item").forEach(el => {
+        el.classList.toggle("active", el.dataset.clientId === clientId);
+      });
+    }
+
+    function refreshDrawerDetails() {
+      const client = getClient(drawerClientId);
+      if (!client) return;
+      document.getElementById("drawer-details").innerHTML = `
+        <div class="detail-row">
+          <label>Имя</label>
+          <p>${displayVal(client.name)}</p>
+        </div>
+        <div class="detail-row">
+          <label>Компания</label>
+          <p>${displayVal(client.company)}</p>
+        </div>
+        <div class="detail-row">
+          <label>Телефон</label>
+          <p>${client.phone ? `<a href="tel:${escapeHtml(client.phone.replace(/\s/g, ""))}">${escapeHtml(client.phone)}</a>` : displayVal("")}</p>
+        </div>
+        <div class="detail-row">
+          <label>Город</label>
+          <p>${displayVal(client.city)}</p>
+        </div>
+        <div class="detail-row">
+          <label>Адрес</label>
+          <p>${displayVal(client.address)}</p>
+        </div>
+        <div class="detail-row">
+          <label>Email</label>
+          <p>${client.email ? `<a href="mailto:${escapeHtml(client.email)}">${escapeHtml(client.email)}</a>` : displayVal("")}</p>
+        </div>
+        <div class="detail-row">
+          <label>Тип объекта</label>
+          <p>${displayVal(client.objectType)}</p>
+        </div>
+        <div class="detail-row">
+          <label>Тип ремонта</label>
+          <p>${displayVal(client.repairType)}</p>
+        </div>
+        <div class="detail-row">
+          <label>Тип отделки</label>
+          <p>${displayVal(client.finishType)}</p>
+        </div>
+        <div class="detail-row">
+          <label>Источник</label>
+          <p>${displayVal(client.source)}</p>
+        </div>
+        <div class="detail-row">
+          <label>М2</label>
+          <p>${hasValue(client.m2) ? `${escapeHtml(client.m2)} м2` : displayVal("")}</p>
+        </div>
+        <div class="detail-row">
+          <label>Номер заказа</label>
+          <p>${displayVal(client.orderNumber)}</p>
+        </div>
+        <div class="detail-row">
+          <label>Дата встречи</label>
+          <p>${displayVal(client.meetingDate)}</p>
+        </div>
+        <div class="detail-row">
+          <label>Статус</label>
+          <p><span class="badge ${STATUS_CLASS[client.status]}">${STATUS_LABELS[client.status]}</span></p>
+        </div>
+        <div class="detail-row">
+          <label>Добавлен</label>
+          <p>${formatDateShort(client.createdAt)}</p>
+        </div>
+      `;
+    }
+
+    function closeDrawer() {
+      document.getElementById("drawer-backdrop").classList.remove("open");
+      document.getElementById("client-drawer").classList.remove("open");
+      document.body.classList.remove("drawer-open");
+      drawerClientId = null;
+      setEditMode(false);
+      document.querySelectorAll(".client-item.active").forEach(el => el.classList.remove("active"));
+    }
+
+    function renderClientDeals() {
+      const list = document.getElementById("client-deals-list");
+      const deals = data.deals.filter(d => d.clientId === drawerClientId);
+      if (!deals.length) {
+        list.innerHTML = '<p class="empty" style="padding:0.25rem 0;">Сделок пока нет</p>';
+        return;
+      }
+      list.innerHTML = deals.map(d => {
+        const stage = STAGES.find(s => s.id === d.stage);
+        return `
+          <div class="client-deal-item">
+            <div>
+              <div class="client-deal-title">${escapeHtml(d.title)}</div>
+              <div class="client-deal-meta">${stage ? stage.label : d.stage}</div>
+            </div>
+            <div style="display:flex;align-items:center;flex-shrink:0;">
+              <span class="stage-pill stage-${d.stage}">${stage ? stage.label : d.stage}</span>
+              <span class="client-deal-amount">${formatMoney(Number(d.amount) || 0)}</span>
+            </div>
+          </div>
+        `;
+      }).join("");
+    }
+
+    function renderComments() {
+      const client = getClient(drawerClientId);
+      const list = document.getElementById("comments-list");
+      if (!client || !client.comments.length) {
+        list.innerHTML = '<p class="empty" style="padding:0.5rem;">Комментариев пока нет</p>';
+        return;
+      }
+      list.innerHTML = client.comments
+        .slice()
+        .sort((a, b) => new Date(b.date) - new Date(a.date))
+        .map(c => `
+          <div class="comment-item">
+            <div class="comment-date">${formatDate(c.date)}</div>
+            <div class="comment-text">${escapeHtml(c.text)}</div>
+            <button type="button" class="comment-delete" data-comment-id="${c.id}" title="Удалить комментарий">✕</button>
+          </div>
+        `)
+        .join("");
+
+      list.querySelectorAll(".comment-delete").forEach(btn => {
+        btn.addEventListener("click", () => {
+          const client = getClient(drawerClientId);
+          if (!client) return;
+          client.comments = client.comments.filter(c => c.id !== btn.dataset.commentId);
+          save();
+          renderComments();
+          renderClients();
+          toast("Комментарий удалён");
+        });
+      });
+    }
+
+    function sortClients(clients) {
+      const sort = document.getElementById("sort-clients").value;
+      return clients.slice().sort((a, b) => {
+        switch (sort) {
+          case "date-asc": return new Date(a.createdAt) - new Date(b.createdAt);
+          case "date-desc": return new Date(b.createdAt) - new Date(a.createdAt);
+          case "name-asc": return a.name.localeCompare(b.name, "ru");
+          case "name-desc": return b.name.localeCompare(a.name, "ru");
+          case "status": return STATUS_ORDER[a.status] - STATUS_ORDER[b.status];
+          default: return 0;
+        }
+      });
+    }
+
+    function renderClients() {
+      const q = document.getElementById("search-clients").value.trim().toLowerCase();
+      const statusFilter = document.getElementById("filter-status").value;
+      const list = document.getElementById("client-list");
+      const empty = document.getElementById("clients-empty");
+
+      let clients = data.clients.filter(c => {
+        const matchSearch = !q || clientSearchText(c).includes(q);
+        const matchStatus = !statusFilter || c.status === statusFilter;
+        return matchSearch && matchStatus;
+      });
+
+      clients = sortClients(clients);
+
+      list.innerHTML = "";
+      empty.style.display = clients.length ? "none" : "block";
+
+      clients.forEach(c => {
+        const div = document.createElement("div");
+        div.className = "client-item" + (drawerClientId === c.id ? " active" : "");
+        div.dataset.clientId = c.id;
+        const sub = c.company || c.email || c.phone || "—";
+        const commentsCount = (c.comments || []).length;
+        const dealsCount = data.deals.filter(d => d.clientId === c.id).length;
+        div.innerHTML = `
+          <div>
+            <div class="client-name">${escapeHtml(c.name)}</div>
+            <div class="client-meta">${escapeHtml(sub)} · ${commentsCount} коммент. · ${dealsCount} сделок</div>
+          </div>
+          <span class="badge ${STATUS_CLASS[c.status]}">${STATUS_LABELS[c.status]}</span>
+          <div class="client-actions">
+            <button type="button" class="btn btn-danger btn-sm" data-delete-client="${c.id}">Удалить</button>
+          </div>
+        `;
+        list.appendChild(div);
+      });
+
+      list.querySelectorAll(".client-item").forEach(item => {
+        item.addEventListener("click", e => {
+          if (e.target.closest("[data-delete-client]")) return;
+          openDrawer(item.dataset.clientId);
+        });
+      });
+
+      list.querySelectorAll("[data-delete-client]").forEach(btn => {
+        btn.addEventListener("click", e => {
+          e.stopPropagation();
+          deleteClient(btn.dataset.deleteClient);
+        });
+      });
+
+      updateDealClientSelect();
+      updateStats();
+    }
+
+    function updateDealClientSelect() {
+      const sel = document.getElementById("deal-client");
+      const prev = sel.value;
+      sel.innerHTML = '<option value="">— выберите клиента —</option>';
+      data.clients.forEach(c => {
+        const opt = document.createElement("option");
+        opt.value = c.id;
+        opt.textContent = c.company ? `${c.name} (${c.company})` : c.name;
+        sel.appendChild(opt);
+      });
+      if (prev && data.clients.some(c => c.id === prev)) sel.value = prev;
+    }
+
+    function deleteClient(id) {
+      if (!confirm("Удалить клиента и все его сделки?")) return;
+      if (drawerClientId === id) closeDrawer();
+      data.clients = data.clients.filter(c => c.id !== id);
+      data.deals = data.deals.filter(d => d.clientId !== id);
+      save();
+      renderClients();
+      renderFunnel();
+      toast("Клиент удалён");
+    }
+
+    function renderFunnel() {
+      STAGES.forEach(({ id }) => {
+        const container = document.querySelector(`.deals[data-stage="${id}"]`);
+        const deals = data.deals.filter(d => d.stage === id);
+        container.innerHTML = "";
+        if (!deals.length) {
+          container.innerHTML = '<p class="empty" style="padding:0.5rem;">Пусто</p>';
+          return;
+        }
+        deals.forEach(d => {
+          const client = getClient(d.clientId);
+          const card = document.createElement("div");
+          card.className = "deal-card";
+          const nextStages = STAGES.filter(s => s.id !== id);
+          const options = nextStages.map(s => `<option value="${s.id}">${s.label}</option>`).join("");
+          card.innerHTML = `
+            <strong>${escapeHtml(d.title)}</strong>
+            <span>${client ? escapeHtml(client.name) : "—"}</span>
+            <div class="deal-amount">${formatMoney(Number(d.amount) || 0)}</div>
+            <select class="deal-move" data-deal="${d.id}">
+              <option value="">Переместить →</option>
+              ${options}
+            </select>
+            <button type="button" class="btn btn-ghost btn-sm" style="margin-top:0.35rem;width:100%" data-delete-deal="${d.id}">Удалить</button>
+          `;
+          container.appendChild(card);
+        });
+
+        container.querySelectorAll(".deal-move").forEach(sel => {
+          sel.addEventListener("change", e => {
+            const stage = e.target.value;
+            if (!stage) return;
+            moveDeal(e.target.dataset.deal, stage);
+            e.target.value = "";
+          });
+        });
+        container.querySelectorAll("[data-delete-deal]").forEach(btn => {
+          btn.addEventListener("click", () => {
+            data.deals = data.deals.filter(d => d.id !== btn.dataset.deleteDeal);
+            save();
+            renderFunnel();
+            updateStats();
+            if (drawerClientId) renderClientDeals();
+            toast("Сделка удалена");
+          });
+        });
+      });
+      updateStats();
+    }
+
+    function moveDeal(id, stage) {
+      const deal = data.deals.find(d => d.id === id);
+      if (deal) {
+        deal.stage = stage;
+        save();
+        renderFunnel();
+        if (drawerClientId) renderClientDeals();
+        const stageName = STAGES.find(s => s.id === stage)?.label || stage;
+        toast(`Сделка перемещена в «${stageName}»`);
+      }
+    }
+
+    function exportCSV() {
+      if (!data.clients.length) { toast("Нет клиентов для экспорта"); return; }
+      const headers = ["Имя", "Компания", "Телефон", "Email", "Статус", "Добавлен", "Комментариев", "Сделок"];
+      const rows = data.clients.map(c => [
+        c.name,
+        c.company || "",
+        c.phone || "",
+        c.email || "",
+        STATUS_LABELS[c.status] || c.status,
+        formatDateShort(c.createdAt),
+        (c.comments || []).length,
+        data.deals.filter(d => d.clientId === c.id).length
+      ]);
+      const csv = [headers, ...rows]
+        .map(row => row.map(v => `"${String(v).replace(/"/g, '""')}"`).join(";"))
+        .join("\n");
+      const bom = "\uFEFF";
+      const blob = new Blob([bom + csv], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `crm-clients-${new Date().toISOString().slice(0, 10)}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast("Файл CSV скачан");
+    }
+
+    // Форма добавления клиента
+    document.getElementById("client-form").addEventListener("submit", e => {
+      e.preventDefault();
+      const name = document.getElementById("client-name").value.trim();
+      const company = document.getElementById("client-company").value.trim();
+      const phone = document.getElementById("client-phone").value.trim();
+      const email = document.getElementById("client-email").value.trim();
+      const status = document.getElementById("client-status").value;
+      const source = document.getElementById("client-source").value;
+      const city = document.getElementById("client-city").value.trim();
+      const address = document.getElementById("client-address").value.trim();
+      const objectType = document.getElementById("client-object-type").value;
+      const repairType = document.getElementById("client-repair-type").value;
+      const finishType = document.getElementById("client-finish-type").value;
+      const m2 = document.getElementById("client-m2").value.trim();
+      const orderNumber = document.getElementById("client-order-number").value.trim();
+      const meetingDate = document.getElementById("client-meeting-date").value;
+      if (!name) return;
+      data.clients.push({
+        id: uid(),
+        name,
+        company,
+        phone,
+        email,
+        status,
+        source,
+        city,
+        address,
+        objectType,
+        repairType,
+        finishType,
+        m2,
+        orderNumber,
+        meetingDate,
+        comments: [],
+        createdAt: new Date().toISOString()
+      });
+      save();
+      e.target.reset();
+      renderClients();
+      toast("Клиент добавлен");
+    });
+
+    // Форма добавления сделки
+    document.getElementById("deal-form").addEventListener("submit", e => {
+      e.preventDefault();
+      const title = document.getElementById("deal-title").value.trim();
+      const clientId = document.getElementById("deal-client").value;
+      const amount = Number(document.getElementById("deal-amount").value) || 0;
+      if (!title || !clientId) { toast("Выберите клиента"); return; }
+      data.deals.push({ id: uid(), title, clientId, amount, stage: "lead" });
+      save();
+      e.target.reset();
+      document.getElementById("deal-amount").value = "0";
+      renderFunnel();
+      toast("Сделка добавлена в «Лид»");
+    });
+
+    // Форма добавления комментария
+    document.getElementById("comment-form").addEventListener("submit", e => {
+      e.preventDefault();
+      const text = document.getElementById("comment-text").value.trim();
+      const client = getClient(drawerClientId);
+      if (!text || !client) return;
+      if (!client.comments) client.comments = [];
+      client.comments.push({ id: uid(), text, date: new Date().toISOString() });
+      save();
+      document.getElementById("comment-text").value = "";
+      renderComments();
+      renderClients();
+      toast("Комментарий добавлен");
+    });
+
+    // Редактирование клиента
+    document.getElementById("btn-edit-client").addEventListener("click", () => {
+      if (editMode) {
+        setEditMode(false);
+        return;
+      }
+      const client = getClient(drawerClientId);
+      if (!client) return;
+      document.getElementById("edit-name").value = client.name;
+      document.getElementById("edit-company").value = client.company || "";
+      document.getElementById("edit-phone").value = client.phone || "";
+      document.getElementById("edit-email").value = client.email || "";
+      document.getElementById("edit-status").value = client.status;
+      document.getElementById("edit-source").value = client.source || "";
+      document.getElementById("edit-city").value = client.city || "";
+      document.getElementById("edit-address").value = client.address || "";
+      document.getElementById("edit-object-type").value = client.objectType || "";
+      document.getElementById("edit-repair-type").value = client.repairType || "";
+      document.getElementById("edit-finish-type").value = client.finishType || "";
+      document.getElementById("edit-m2").value = client.m2 || "";
+      document.getElementById("edit-order-number").value = client.orderNumber || "";
+      document.getElementById("edit-meeting-date").value = client.meetingDate || "";
+      setEditMode(true);
+    });
+
+    document.getElementById("btn-cancel-edit").addEventListener("click", () => setEditMode(false));
+
+    document.getElementById("edit-client-form").addEventListener("submit", e => {
+      e.preventDefault();
+      const client = getClient(drawerClientId);
+      if (!client) return;
+      client.name = document.getElementById("edit-name").value.trim();
+      client.company = document.getElementById("edit-company").value.trim();
+      client.phone = document.getElementById("edit-phone").value.trim();
+      client.email = document.getElementById("edit-email").value.trim();
+      client.status = document.getElementById("edit-status").value;
+      client.source = document.getElementById("edit-source").value;
+      client.city = document.getElementById("edit-city").value.trim();
+      client.address = document.getElementById("edit-address").value.trim();
+      client.objectType = document.getElementById("edit-object-type").value;
+      client.repairType = document.getElementById("edit-repair-type").value;
+      client.finishType = document.getElementById("edit-finish-type").value;
+      client.m2 = document.getElementById("edit-m2").value.trim();
+      client.orderNumber = document.getElementById("edit-order-number").value.trim();
+      client.meetingDate = document.getElementById("edit-meeting-date").value;
+      save();
+      document.getElementById("drawer-title").textContent = client.name;
+      setEditMode(false);
+      refreshDrawerDetails();
+      renderClients();
+      renderFunnel();
+      toast("Изменения сохранены");
+    });
+
+    // Экспорт CSV
+    document.getElementById("btn-export-csv").addEventListener("click", exportCSV);
+    document.getElementById("btn-copy-client-card").addEventListener("click", copyClientCard);
+
+    document.getElementById("drawer-close").addEventListener("click", closeDrawer);
+    document.getElementById("drawer-backdrop").addEventListener("click", closeDrawer);
+
+    document.addEventListener("keydown", e => {
+      if (e.key === "Escape" && drawerClientId) {
+        if (editMode) { setEditMode(false); } else { closeDrawer(); }
+      }
+    });
+
+    document.getElementById("search-clients").addEventListener("input", renderClients);
+    document.getElementById("filter-status").addEventListener("change", renderClients);
+    document.getElementById("sort-clients").addEventListener("change", renderClients);
+
+    document.querySelectorAll(".tab").forEach(tab => {
+      tab.addEventListener("click", () => {
+        document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
+        document.querySelectorAll(".panel").forEach(p => p.classList.remove("active"));
+        tab.classList.add("active");
+        document.getElementById("panel-" + tab.dataset.tab).classList.add("active");
+      });
+    });
+
+    load();
+    renderClients();
+    renderFunnel();
+  </script>
+</body>
+</html>
