@@ -1374,15 +1374,57 @@
       if (col && !col.contains(e.relatedTarget)) col.classList.remove("drag-over");
     }
 
+    function updateDealMoveOptions(card, stage) {
+      const sel = card.querySelector(".deal-move");
+      if (!sel) return;
+      const nextStages = STAGES.filter(s => s.id !== stage);
+      const options = nextStages.map(s => `<option value="${s.id}">${s.label}</option>`).join("");
+      sel.innerHTML = `
+        <option value="">Переместить →</option>
+        ${options}
+      `;
+      sel.value = "";
+    }
+
+    function syncFunnelEmptyState(container) {
+      if (!container) return;
+      const hasCards = container.querySelector(".deal-card");
+      const empty = container.querySelector(".empty");
+      if (hasCards && empty) {
+        empty.remove();
+      } else if (!hasCards && !empty) {
+        container.innerHTML = '<p class="empty" style="padding:0.5rem;">Пусто</p>';
+      }
+    }
+
     function handleFunnelDrop(e) {
       e.preventDefault();
       const targetStage = e.currentTarget.dataset.stage;
+      const targetContainer = e.currentTarget;
       const dropDealId = (e.dataTransfer && e.dataTransfer.getData("text/plain")) || draggedDealId;
       clearFunnelHighlights();
       if (!dropDealId || !targetStage) return;
       const deal = data.deals.find(d => d.id === dropDealId);
       if (!deal || deal.stage === targetStage) return;
-      moveDeal(dropDealId, targetStage);
+      const draggedCard = document.querySelector(`.deal-card[data-deal-id="${dropDealId}"]`);
+      if (!draggedCard) return;
+
+      const sourceContainer = draggedCard.parentElement;
+      deal.stage = targetStage;
+      save();
+
+      const targetEmpty = targetContainer.querySelector(".empty");
+      if (targetEmpty) targetEmpty.remove();
+      targetContainer.appendChild(draggedCard);
+      updateDealMoveOptions(draggedCard, targetStage);
+
+      syncFunnelEmptyState(sourceContainer);
+      syncFunnelEmptyState(targetContainer);
+      updateStats();
+      if (drawerClientId) renderClientDeals();
+
+      const stageName = STAGES.find(s => s.id === targetStage)?.label || targetStage;
+      toast(`Сделка перемещена в «${stageName}»`);
     }
 
     function renderFunnel() {
@@ -1455,7 +1497,18 @@
       if (deal) {
         deal.stage = stage;
         save();
-        renderFunnel();
+        const card = document.querySelector(`.deal-card[data-deal-id="${id}"]`);
+        const targetContainer = document.querySelector(`.deals[data-stage="${stage}"]`);
+        if (card && targetContainer) {
+          const sourceContainer = card.parentElement;
+          const targetEmpty = targetContainer.querySelector(".empty");
+          if (targetEmpty) targetEmpty.remove();
+          targetContainer.appendChild(card);
+          updateDealMoveOptions(card, stage);
+          syncFunnelEmptyState(sourceContainer);
+          syncFunnelEmptyState(targetContainer);
+        }
+        updateStats();
         if (drawerClientId) renderClientDeals();
         const stageName = STAGES.find(s => s.id === stage)?.label || stage;
         toast(`Сделка перемещена в «${stageName}»`);
