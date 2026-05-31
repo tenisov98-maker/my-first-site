@@ -1338,6 +1338,9 @@
       toast("Клиент удалён");
     }
 
+    let draggedCardEl = null;
+    let dragSourceContainerEl = null;
+
     function clearFunnelHighlights() {
       document.querySelectorAll(".funnel-col.drag-over").forEach(col => col.classList.remove("drag-over"));
     }
@@ -1345,6 +1348,8 @@
     function handleDealDragStart(e) {
       const dealId = e.currentTarget.dataset.dealId;
       draggedDealId = dealId;
+      draggedCardEl = e.currentTarget;
+      dragSourceContainerEl = e.currentTarget.parentElement;
       e.currentTarget.classList.add("dragging");
       if (e.dataTransfer) {
         e.dataTransfer.effectAllowed = "move";
@@ -1355,23 +1360,17 @@
     function handleDealDragEnd(e) {
       e.currentTarget.classList.remove("dragging");
       draggedDealId = null;
+      draggedCardEl = null;
+      dragSourceContainerEl = null;
       clearFunnelHighlights();
     }
 
     function handleFunnelDragOver(e) {
       e.preventDefault();
       if (e.dataTransfer) e.dataTransfer.dropEffect = "move";
-    }
-
-    function handleFunnelDragEnter(e) {
-      e.preventDefault();
+      clearFunnelHighlights();
       const col = e.currentTarget.closest(".funnel-col");
       if (col) col.classList.add("drag-over");
-    }
-
-    function handleFunnelDragLeave(e) {
-      const col = e.currentTarget.closest(".funnel-col");
-      if (col && !col.contains(e.relatedTarget)) col.classList.remove("drag-over");
     }
 
     function updateDealMoveOptions(card, stage) {
@@ -1406,10 +1405,10 @@
       if (!dropDealId || !targetStage) return;
       const deal = data.deals.find(d => d.id === dropDealId);
       if (!deal || deal.stage === targetStage) return;
-      const draggedCard = document.querySelector(`.deal-card[data-deal-id="${dropDealId}"]`);
+      const draggedCard = draggedCardEl || document.querySelector(`.deal-card[data-deal-id="${dropDealId}"]`);
       if (!draggedCard) return;
 
-      const sourceContainer = draggedCard.parentElement;
+      const sourceContainer = dragSourceContainerEl || draggedCard.parentElement;
       deal.stage = targetStage;
       save();
 
@@ -1431,8 +1430,6 @@
       STAGES.forEach(({ id }) => {
         const container = document.querySelector(`.deals[data-stage="${id}"]`);
         container.ondragover = handleFunnelDragOver;
-        container.ondragenter = handleFunnelDragEnter;
-        container.ondragleave = handleFunnelDragLeave;
         container.ondrop = handleFunnelDrop;
         const deals = data.deals.filter(d => d.stage === id);
         container.innerHTML = "";
