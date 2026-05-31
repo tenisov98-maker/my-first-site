@@ -1354,8 +1354,12 @@
       document.querySelectorAll(".deals[data-stage]").forEach(container => {
         const sortable = new Sortable(container, {
           group: "deals",
-          animation: 140,
+          animation: 150,
+          delay: 0,
+          delayOnTouchOnly: false,
+          forceFallback: false,
           draggable: ".deal-card",
+          filter: "[data-drag-ignore]",
           ghostClass: "sortable-ghost",
           chosenClass: "sortable-chosen",
           onStart: evt => {
@@ -1394,6 +1398,9 @@
               const stageName = STAGES.find(s => s.id === targetStage)?.label || targetStage;
               toast(`Сделка перемещена в «${stageName}»`);
             }
+          },
+          onFilter: evt => {
+            evt.preventDefault();
           }
         });
         funnelSortables.push(sortable);
@@ -1443,12 +1450,12 @@
             <strong>${escapeHtml(d.title)}</strong>
             <span>${client ? escapeHtml(client.name) : "—"}</span>
             <div class="deal-amount">${formatMoney(Number(d.amount) || 0)}</div>
-            <button type="button" class="btn btn-ghost btn-sm" style="margin-top:0.35rem;width:100%" data-open-client="${d.clientId}">👤 Клиент</button>
-            <select class="deal-move" data-deal="${d.id}">
+            <button type="button" class="btn btn-ghost btn-sm" style="margin-top:0.35rem;width:100%" data-drag-ignore="true" data-open-client="${d.clientId}">👤 Клиент</button>
+            <select class="deal-move" data-drag-ignore="true" data-deal="${d.id}">
               <option value="">Переместить →</option>
               ${options}
             </select>
-            <button type="button" class="btn btn-ghost btn-sm" style="margin-top:0.35rem;width:100%" data-delete-deal="${d.id}">Удалить</button>
+            <button type="button" class="btn btn-ghost btn-sm" style="margin-top:0.35rem;width:100%" data-drag-ignore="true" data-delete-deal="${d.id}">Удалить</button>
           `;
           container.appendChild(card);
         });
