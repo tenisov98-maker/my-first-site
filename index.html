@@ -914,6 +914,16 @@
     let data = { clients: [], deals: [] };
     let drawerClientId = null;
     let editMode = false;
+    let funnelSyncTimer = null;
+
+    function scheduleFunnelSync() {
+      if (funnelSyncTimer) clearTimeout(funnelSyncTimer);
+      funnelSyncTimer = setTimeout(() => {
+        save();
+        updateStats();
+        if (drawerClientId) renderClientDeals();
+      }, 300);
+    }
 
     function uid() {
       return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
@@ -1388,12 +1398,10 @@
 
             const changedStage = deal.stage !== targetStage;
             deal.stage = targetStage;
-            save();
             updateDealMoveOptions(item, targetStage);
             syncFunnelEmptyState(sourceContainer);
             syncFunnelEmptyState(targetContainer);
-            updateStats();
-            if (drawerClientId) renderClientDeals();
+            scheduleFunnelSync();
             if (changedStage) {
               const stageName = STAGES.find(s => s.id === targetStage)?.label || targetStage;
               toast(`Сделка перемещена в «${stageName}»`);
