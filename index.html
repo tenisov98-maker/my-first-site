@@ -412,12 +412,16 @@
     .deal-card span { font-size: 0.75rem; color: var(--muted); }
     .deal-amount { font-weight: 700; color: var(--success); font-size: 0.85rem; margin-top: 0.35rem; }
     .funnel-col[data-stage="lost"] .deal-amount { color: var(--danger); }
-    .deal-actions { display: flex; gap: 0.35rem; margin-top: 0.45rem; }
-
-    .deal-modal-grid {
-      display: grid;
-      gap: 0.75rem;
-      margin-bottom: 1rem;
+    .deal-actions { display: flex; gap: 0.45rem; margin-top: 0.5rem; }
+    .deal-action-btn {
+      padding: 8px;
+      min-width: 34px;
+      min-height: 34px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+      line-height: 1;
     }
 
     .empty { font-size: 0.85rem; color: var(--muted); text-align: center; padding: 1.5rem; }
@@ -991,25 +995,11 @@
     </div>
   </div>
 
-  <div class="modal-backdrop" id="deal-modal-backdrop" aria-hidden="true">
-    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="deal-modal-title">
-      <div class="modal-header">
-        <h3 id="deal-modal-title">Сделка</h3>
-        <button type="button" class="drawer-close" id="deal-modal-close" aria-label="Закрыть">✕</button>
-      </div>
-      <div class="modal-body">
-        <div class="deal-modal-grid" id="deal-modal-details"></div>
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-ghost" id="deal-modal-edit">Редактировать</button>
-        <button type="button" class="btn btn-danger" id="deal-modal-delete">Удалить</button>
-      </div>
-    </div>
-  </div>
-
+  <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
   <script>
     const STORAGE_KEY = "crm-data-v2";
     const STAGES_STORAGE_KEY = "crm-funnel-stages-v1";
+    const CLIENT_DRAFT_KEY = "crm-client-draft-v1";
     const DEFAULT_STAGES = [
       { id: "lead", label: "Лид" },
       { id: "contact", label: "Контакт" },
@@ -1026,8 +1016,7 @@
     let drawerClientId = null;
     let editMode = false;
     let stagesDraft = [];
-    let stageDragId = null;
-    let activeDealId = null;
+    let stagesSortable = null;
 
     function uid() {
       return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
@@ -1100,6 +1089,86 @@
       localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
     }
 
+    function getInitialStage() {
+      return STAGES[0] || { id: "lead", label: "Лид" };
+    }
+
+    function syncBodyLock() {
+      const isDrawerOpen = document.getElementById("client-drawer").classList.contains("open");
+      const isStagesModalOpen = document.getElementById("stages-modal-backdrop").classList.contains("open");
+      const isDealModalOpen = false;
+      document.body.classList.toggle("drawer-open", isDrawerOpen || isStagesModalOpen || isDealModalOpen);
+    }
+
+    function normalizePhone(phone) {
+      return String(phone || "").replace(/\D/g, "");
+    }
+
+    function findPotentialDuplicateClient({ name, phone, email }) {
+      const phoneNormalized = normalizePhone(phone);
+      const emailNormalized = String(email || "").trim().toLowerCase();
+      const nameNormalized = String(name || "").trim().toLowerCase();
+
+      return data.clients.find(client => {
+        const samePhone = phoneNormalized && normalizePhone(client.phone) === phoneNormalized;
+        const sameEmail = emailNormalized && String(client.email || "").trim().toLowerCase() === emailNormalized;
+        const sameName = nameNormalized && String(client.name || "").trim().toLowerCase() === nameNormalized;
+        return samePhone || sameEmail || (sameName && (samePhone || sameEmail));
+      });
+    }
+
+    function saveClientDraft() {
+      const form = document.getElementById("client-form");
+      if (!form) return;
+      const payload = {
+        name: document.getElementById("client-name").value,
+        company: document.getElementById("client-company").value,
+        phone: document.getElementById("client-phone").value,
+        email: document.getElementById("client-email").value,
+        status: document.getElementById("client-status").value,
+        source: document.getElementById("client-source").value,
+        city: document.getElementById("client-city").value,
+        address: document.getElementById("client-address").value,
+        objectType: document.getElementById("client-object-type").value,
+        repairType: document.getElementById("client-repair-type").value,
+        finishType: document.getElementById("client-finish-type").value,
+        m2: document.getElementById("client-m2").value,
+        orderNumber: document.getElementById("client-order-number").value,
+        meetingDate: document.getElementById("client-meeting-date").value
+      };
+      localStorage.setItem(CLIENT_DRAFT_KEY, JSON.stringify(payload));
+    }
+
+    function clearClientDraft() {
+      localStorage.removeItem(CLIENT_DRAFT_KEY);
+    }
+
+    function loadClientDraft() {
+      try {
+        const raw = localStorage.getItem(CLIENT_DRAFT_KEY);
+        if (!raw) return;
+        const draft = JSON.parse(raw);
+        if (!draft || typeof draft !== "object") return;
+
+        if (draft.name) document.getElementById("client-name").value = draft.name;
+        if (draft.company) document.getElementById("client-company").value = draft.company;
+        if (draft.phone) document.getElementById("client-phone").value = draft.phone;
+        if (draft.email) document.getElementById("client-email").value = draft.email;
+        if (draft.status) document.getElementById("client-status").value = draft.status;
+        if (draft.source) document.getElementById("client-source").value = draft.source;
+        if (draft.city) document.getElementById("client-city").value = draft.city;
+        if (draft.address) document.getElementById("client-address").value = draft.address;
+        if (draft.objectType) document.getElementById("client-object-type").value = draft.objectType;
+        if (draft.repairType) document.getElementById("client-repair-type").value = draft.repairType;
+        if (draft.finishType) document.getElementById("client-finish-type").value = draft.finishType;
+        if (draft.m2) document.getElementById("client-m2").value = draft.m2;
+        if (draft.orderNumber) document.getElementById("client-order-number").value = draft.orderNumber;
+        if (draft.meetingDate) document.getElementById("client-meeting-date").value = draft.meetingDate;
+      } catch (_) {
+        // Ignore invalid draft payloads.
+      }
+    }
+
     function buildFunnelColumns() {
       const funnel = document.getElementById("funnel");
       funnel.innerHTML = STAGES.map(stage => `
@@ -1114,18 +1183,18 @@
       stagesDraft = STAGES.map(s => ({ ...s }));
       renderStagesDraft();
       document.getElementById("stages-modal-backdrop").classList.add("open");
-      document.body.classList.add("drawer-open");
+      syncBodyLock();
     }
 
     function closeStagesModal() {
       document.getElementById("stages-modal-backdrop").classList.remove("open");
-      document.body.classList.remove("drawer-open");
+      syncBodyLock();
     }
 
     function renderStagesDraft() {
       const list = document.getElementById("stages-editor-list");
       list.innerHTML = stagesDraft.map((stage, index) => `
-        <div class="stage-editor-row" data-stage-row="${stage.id}" draggable="true">
+        <div class="stage-editor-row" data-stage-row="${stage.id}">
           <div class="stage-drag-handle" title="Перетащите для смены порядка">⠿</div>
           <div class="stage-editor-order">${index + 1}</div>
           <input type="text" value="${escapeHtml(stage.label)}" data-stage-label="${stage.id}" placeholder="Название этапа">
@@ -1157,32 +1226,24 @@
           renderStagesDraft();
         });
       });
-
-      list.querySelectorAll("[data-stage-row]").forEach(row => {
-        row.addEventListener("dragstart", e => {
-          stageDragId = row.dataset.stageRow;
-          row.classList.add("is-dragging");
-          if (e.dataTransfer) e.dataTransfer.effectAllowed = "move";
+      if (stagesSortable) {
+        stagesSortable.destroy();
+        stagesSortable = null;
+      }
+      if (window.Sortable) {
+        stagesSortable = new window.Sortable(list, {
+          animation: 150,
+          handle: ".stage-drag-handle",
+          draggable: ".stage-editor-row",
+          ghostClass: "is-dragging",
+          onEnd: evt => {
+            if (evt.oldIndex == null || evt.newIndex == null || evt.oldIndex === evt.newIndex) return;
+            const [moved] = stagesDraft.splice(evt.oldIndex, 1);
+            stagesDraft.splice(evt.newIndex, 0, moved);
+            renderStagesDraft();
+          }
         });
-        row.addEventListener("dragend", () => {
-          stageDragId = null;
-          row.classList.remove("is-dragging");
-        });
-        row.addEventListener("dragover", e => {
-          e.preventDefault();
-        });
-        row.addEventListener("drop", e => {
-          e.preventDefault();
-          const targetId = row.dataset.stageRow;
-          if (!stageDragId || !targetId || stageDragId === targetId) return;
-          const from = stagesDraft.findIndex(s => s.id === stageDragId);
-          const to = stagesDraft.findIndex(s => s.id === targetId);
-          if (from < 0 || to < 0) return;
-          const [moved] = stagesDraft.splice(from, 1);
-          stagesDraft.splice(to, 0, moved);
-          renderStagesDraft();
-        });
-      });
+      }
     }
 
     function addStageDraft() {
@@ -1212,38 +1273,8 @@
       return data.deals.find(d => d.id === id);
     }
 
-    function openDealModal(dealId) {
+    function editDeal(dealId) {
       const deal = getDeal(dealId);
-      if (!deal) return;
-      activeDealId = dealId;
-      const client = getClient(deal.clientId);
-      document.getElementById("deal-modal-title").textContent = deal.title;
-      document.getElementById("deal-modal-details").innerHTML = `
-        <div class="detail-row">
-          <label>Название</label>
-          <p>${escapeHtml(deal.title)}</p>
-        </div>
-        <div class="detail-row">
-          <label>Клиент</label>
-          <p>${client ? escapeHtml(client.name) : "—"}</p>
-        </div>
-        <div class="detail-row">
-          <label>Сумма</label>
-          <p>${formatMoney(Number(deal.amount) || 0)}</p>
-        </div>
-      `;
-      document.getElementById("deal-modal-backdrop").classList.add("open");
-      document.body.classList.add("drawer-open");
-    }
-
-    function closeDealModal() {
-      document.getElementById("deal-modal-backdrop").classList.remove("open");
-      document.body.classList.remove("drawer-open");
-      activeDealId = null;
-    }
-
-    function editDealFromModal() {
-      const deal = getDeal(activeDealId);
       if (!deal) return;
       const nextTitle = prompt("Название сделки", deal.title);
       if (nextTitle == null) return;
@@ -1258,16 +1289,16 @@
       deal.amount = Number(nextAmount) || 0;
       save();
       renderFunnel();
-      closeDealModal();
+      if (drawerClientId) renderClientDeals();
       toast("Сделка обновлена");
     }
 
-    function deleteDealFromModal() {
-      if (!activeDealId) return;
-      data.deals = data.deals.filter(d => d.id !== activeDealId);
+    function deleteDeal(dealId) {
+      if (!dealId) return;
+      data.deals = data.deals.filter(d => d.id !== dealId);
       save();
       renderFunnel();
-      closeDealModal();
+      if (drawerClientId) renderClientDeals();
       toast("Сделка удалена");
     }
 
@@ -1419,7 +1450,7 @@
 
       document.getElementById("drawer-backdrop").classList.add("open");
       document.getElementById("client-drawer").classList.add("open");
-      document.body.classList.add("drawer-open");
+      syncBodyLock();
 
       document.querySelectorAll(".client-item").forEach(el => {
         el.classList.toggle("active", el.dataset.clientId === clientId);
@@ -1496,7 +1527,7 @@
     function closeDrawer() {
       document.getElementById("drawer-backdrop").classList.remove("open");
       document.getElementById("client-drawer").classList.remove("open");
-      document.body.classList.remove("drawer-open");
+      syncBodyLock();
       drawerClientId = null;
       setEditMode(false);
       document.querySelectorAll(".client-item.active").forEach(el => el.classList.remove("active"));
@@ -1681,9 +1712,8 @@
             <span>${client ? escapeHtml(client.name) : "—"}</span>
             <div class="deal-amount">${formatMoney(Number(d.amount) || 0)}</div>
             <div class="deal-actions">
-              <button type="button" class="btn btn-ghost btn-sm" data-open-client="${d.clientId}">👤</button>
-              <button type="button" class="btn btn-ghost btn-sm" data-open-deal="${d.id}">✏</button>
-              <button type="button" class="btn btn-ghost btn-sm" data-delete-deal="${d.id}">🗑</button>
+              <button type="button" class="btn btn-ghost deal-action-btn" data-edit-deal="${d.id}" title="Редактировать">✏</button>
+              <button type="button" class="btn btn-ghost deal-action-btn" data-delete-deal="${d.id}" title="Удалить">🗑</button>
             </div>
           `;
           container.appendChild(card);
@@ -1692,31 +1722,21 @@
         container.querySelectorAll(".deal-card").forEach(card => {
           card.addEventListener("click", e => {
             if (e.target.closest("button")) return;
-            openDealModal(card.dataset.dealId);
+            const deal = getDeal(card.dataset.dealId);
+            if (!deal || !deal.clientId) return;
+            openDrawer(deal.clientId);
           });
         });
-        container.querySelectorAll("[data-open-client]").forEach(btn => {
+        container.querySelectorAll("[data-edit-deal]").forEach(btn => {
           btn.addEventListener("click", e => {
             e.stopPropagation();
-            if (!btn.dataset.openClient) return;
-            openDrawer(btn.dataset.openClient);
-          });
-        });
-        container.querySelectorAll("[data-open-deal]").forEach(btn => {
-          btn.addEventListener("click", e => {
-            e.stopPropagation();
-            openDealModal(btn.dataset.openDeal);
+            editDeal(btn.dataset.editDeal);
           });
         });
         container.querySelectorAll("[data-delete-deal]").forEach(btn => {
           btn.addEventListener("click", e => {
             e.stopPropagation();
-            data.deals = data.deals.filter(d => d.id !== btn.dataset.deleteDeal);
-            save();
-            renderFunnel();
-            updateStats();
-            if (drawerClientId) renderClientDeals();
-            toast("Сделка удалена");
+            deleteDeal(btn.dataset.deleteDeal);
           });
         });
       });
@@ -1781,6 +1801,11 @@
       const orderNumber = document.getElementById("client-order-number").value.trim();
       const meetingDate = document.getElementById("client-meeting-date").value;
       if (!name) return;
+      const duplicate = findPotentialDuplicateClient({ name, phone, email });
+      if (duplicate) {
+        toast("Похожий клиент уже есть (телефон/email)");
+        return;
+      }
       data.clients.push({
         id: uid(),
         name,
@@ -1802,6 +1827,7 @@
       });
       save();
       e.target.reset();
+      clearClientDraft();
       renderClients();
       toast("Клиент добавлен");
     });
@@ -1813,12 +1839,13 @@
       const clientId = document.getElementById("deal-client").value;
       const amount = Number(document.getElementById("deal-amount").value) || 0;
       if (!title || !clientId) { toast("Выберите клиента"); return; }
-      data.deals.push({ id: uid(), title, clientId, amount, stage: "lead" });
+      const initialStage = getInitialStage();
+      data.deals.push({ id: uid(), title, clientId, amount, stage: initialStage.id });
       save();
       e.target.reset();
       document.getElementById("deal-amount").value = "0";
       renderFunnel();
-      toast("Сделка добавлена в «Лид»");
+      toast(`Сделка добавлена в «${initialStage.label}»`);
     });
 
     // Форма добавления комментария
@@ -1900,12 +1927,6 @@
     });
     document.getElementById("btn-add-stage").addEventListener("click", addStageDraft);
     document.getElementById("btn-save-stages").addEventListener("click", saveStagesDraft);
-    document.getElementById("deal-modal-close").addEventListener("click", closeDealModal);
-    document.getElementById("deal-modal-backdrop").addEventListener("click", e => {
-      if (e.target.id === "deal-modal-backdrop") closeDealModal();
-    });
-    document.getElementById("deal-modal-edit").addEventListener("click", editDealFromModal);
-    document.getElementById("deal-modal-delete").addEventListener("click", deleteDealFromModal);
 
     document.getElementById("drawer-close").addEventListener("click", closeDrawer);
     document.getElementById("drawer-backdrop").addEventListener("click", closeDrawer);
@@ -1920,6 +1941,11 @@
     document.getElementById("filter-status").addEventListener("change", renderClients);
     document.getElementById("sort-clients").addEventListener("change", renderClients);
 
+    document.querySelectorAll("#client-form input, #client-form select").forEach(el => {
+      el.addEventListener("input", saveClientDraft);
+      el.addEventListener("change", saveClientDraft);
+    });
+
     document.querySelectorAll(".tab").forEach(tab => {
       tab.addEventListener("click", () => {
         document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
@@ -1931,6 +1957,7 @@
 
     loadStages();
     load();
+    loadClientDraft();
     renderClients();
     renderFunnel();
   </script>
