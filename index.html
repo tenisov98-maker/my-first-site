@@ -376,6 +376,10 @@
       background: #f8fafc;
     }
 
+    .stage-editor-row.is-dragging {
+      opacity: 0.45;
+    }
+
     .stage-drag-handle {
       width: 1.4rem;
       height: 1.4rem;
@@ -404,49 +408,42 @@
       padding: 0.45rem 0.6rem;
     }
 
-    .stage-editor-row.sortable-ghost { opacity: 0.35; }
-
-    .deal-stages {
-      display: flex;
-      align-items: center;
-      gap: 0.25rem;
-      margin-bottom: 0.5rem;
-      flex-wrap: wrap;
-    }
-
-    .deal-stage-btn {
-      border: none;
-      background: #e5e7eb;
-      color: #475569;
-      border-radius: 999px;
-      font-size: 0.65rem;
-      font-weight: 600;
-      padding: 0.2rem 0.45rem;
-      cursor: pointer;
-      font-family: inherit;
-      line-height: 1.2;
-      transition: opacity 0.15s ease;
-    }
-
-    .deal-stage-btn:hover { opacity: 0.9; }
-    .deal-stage-btn.is-active { color: #fff; }
-    .deal-stage-btn[data-stage="lead"].is-active { background: #1d4ed8; }
-    .deal-stage-btn[data-stage="contact"].is-active { background: #b45309; }
-    .deal-stage-btn[data-stage="proposal"].is-active { background: #6d28d9; }
-    .deal-stage-btn[data-stage="won"].is-active { background: #15803d; }
-    .deal-stage-btn[data-stage="lost"].is-active { background: #b91c1c; }
-
-    .deal-stage-arrow {
-      color: #94a3b8;
-      font-size: 0.75rem;
-      line-height: 1;
-      user-select: none;
-    }
-
     .deal-card strong { font-size: 0.9rem; display: block; }
     .deal-card span { font-size: 0.75rem; color: var(--muted); }
     .deal-amount { font-weight: 700; color: var(--success); font-size: 0.85rem; margin-top: 0.35rem; }
     .funnel-col[data-stage="lost"] .deal-amount { color: var(--danger); }
+    .deal-actions { display: flex; gap: 0.35rem; margin-top: 0.45rem; }
+
+    .deal-modal-grid {
+      display: grid;
+      gap: 0.75rem;
+      margin-bottom: 1rem;
+    }
+
+    .deal-modal-stage-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.35rem;
+      margin-bottom: 1rem;
+    }
+
+    .deal-modal-stage-btn {
+      border: none;
+      background: #e5e7eb;
+      color: #475569;
+      border-radius: 999px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      padding: 0.35rem 0.6rem;
+      cursor: pointer;
+      font-family: inherit;
+      line-height: 1.2;
+    }
+
+    .deal-modal-stage-btn.is-active {
+      background: var(--accent);
+      color: #fff;
+    }
 
     .empty { font-size: 0.85rem; color: var(--muted); text-align: center; padding: 1.5rem; }
 
@@ -1008,6 +1005,23 @@
     </div>
   </div>
 
+  <div class="modal-backdrop" id="deal-modal-backdrop" aria-hidden="true">
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="deal-modal-title">
+      <div class="modal-header">
+        <h3 id="deal-modal-title">Сделка</h3>
+        <button type="button" class="drawer-close" id="deal-modal-close" aria-label="Закрыть">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="deal-modal-grid" id="deal-modal-details"></div>
+        <div class="deal-modal-stage-row" id="deal-modal-stages"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-ghost" id="deal-modal-edit">Редактировать</button>
+        <button type="button" class="btn btn-danger" id="deal-modal-delete">Удалить</button>
+      </div>
+    </div>
+  </div>
+
   <script>
     const STORAGE_KEY = "crm-data-v2";
     const STAGES_STORAGE_KEY = "crm-funnel-stages-v1";
@@ -1027,7 +1041,8 @@
     let drawerClientId = null;
     let editMode = false;
     let stagesDraft = [];
-    let stagesSortable = null;
+    let stageDragId = null;
+    let activeDealId = null;
 
     function uid() {
       return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
@@ -1113,16 +1128,11 @@
     function openStagesModal() {
       stagesDraft = STAGES.map(s => ({ ...s }));
       renderStagesDraft();
-      initStagesSortable();
       document.getElementById("stages-modal-backdrop").classList.add("open");
       document.body.classList.add("drawer-open");
     }
 
     function closeStagesModal() {
-      if (stagesSortable) {
-        stagesSortable.destroy();
-        stagesSortable = null;
-      }
       document.getElementById("stages-modal-backdrop").classList.remove("open");
       document.body.classList.remove("drawer-open");
     }
@@ -1130,7 +1140,7 @@
     function renderStagesDraft() {
       const list = document.getElementById("stages-editor-list");
       list.innerHTML = stagesDraft.map((stage, index) => `
-        <div class="stage-editor-row" data-stage-row="${stage.id}">
+        <div class="stage-editor-row" data-stage-row="${stage.id}" draggable="true">
           <div class="stage-drag-handle" title="Перетащите для смены порядка">⠿</div>
           <div class="stage-editor-order">${index + 1}</div>
           <input type="text" value="${escapeHtml(stage.label)}" data-stage-label="${stage.id}" placeholder="Название этапа">
@@ -1160,35 +1170,39 @@
           }
           stagesDraft = stagesDraft.filter(s => s.id !== stageId);
           renderStagesDraft();
-          initStagesSortable();
         });
       });
-    }
 
-    function initStagesSortable() {
-      const list = document.getElementById("stages-editor-list");
-      if (!list) return;
-      if (stagesSortable) stagesSortable.destroy();
-      stagesSortable = new Sortable(list, {
-        animation: 150,
-        handle: ".stage-drag-handle",
-        draggable: ".stage-editor-row",
-        ghostClass: "sortable-ghost",
-        onEnd: () => {
-          const order = Array.from(list.querySelectorAll("[data-stage-row]")).map(el => el.dataset.stageRow);
-          stagesDraft = order
-            .map(id => stagesDraft.find(s => s.id === id))
-            .filter(Boolean);
+      list.querySelectorAll("[data-stage-row]").forEach(row => {
+        row.addEventListener("dragstart", e => {
+          stageDragId = row.dataset.stageRow;
+          row.classList.add("is-dragging");
+          if (e.dataTransfer) e.dataTransfer.effectAllowed = "move";
+        });
+        row.addEventListener("dragend", () => {
+          stageDragId = null;
+          row.classList.remove("is-dragging");
+        });
+        row.addEventListener("dragover", e => {
+          e.preventDefault();
+        });
+        row.addEventListener("drop", e => {
+          e.preventDefault();
+          const targetId = row.dataset.stageRow;
+          if (!stageDragId || !targetId || stageDragId === targetId) return;
+          const from = stagesDraft.findIndex(s => s.id === stageDragId);
+          const to = stagesDraft.findIndex(s => s.id === targetId);
+          if (from < 0 || to < 0) return;
+          const [moved] = stagesDraft.splice(from, 1);
+          stagesDraft.splice(to, 0, moved);
           renderStagesDraft();
-          initStagesSortable();
-        }
+        });
       });
     }
 
     function addStageDraft() {
       stagesDraft.push({ id: uid(), label: "Новый этап" });
       renderStagesDraft();
-      initStagesSortable();
     }
 
     function saveStagesDraft() {
@@ -1207,6 +1221,81 @@
       buildFunnelColumns();
       renderFunnel();
       toast("Этапы сохранены");
+    }
+
+    function getDeal(id) {
+      return data.deals.find(d => d.id === id);
+    }
+
+    function openDealModal(dealId) {
+      const deal = getDeal(dealId);
+      if (!deal) return;
+      activeDealId = dealId;
+      const client = getClient(deal.clientId);
+      document.getElementById("deal-modal-title").textContent = deal.title;
+      document.getElementById("deal-modal-details").innerHTML = `
+        <div class="detail-row">
+          <label>Название</label>
+          <p>${escapeHtml(deal.title)}</p>
+        </div>
+        <div class="detail-row">
+          <label>Клиент</label>
+          <p>${client ? escapeHtml(client.name) : "—"}</p>
+        </div>
+        <div class="detail-row">
+          <label>Сумма</label>
+          <p>${formatMoney(Number(deal.amount) || 0)}</p>
+        </div>
+      `;
+      document.getElementById("deal-modal-stages").innerHTML = STAGES.map(stage => `
+        <button type="button" class="deal-modal-stage-btn${stage.id === deal.stage ? " is-active" : ""}" data-modal-stage="${stage.id}">
+          ${escapeHtml(stage.label)}
+        </button>
+      `).join("");
+      document.querySelectorAll("[data-modal-stage]").forEach(btn => {
+        btn.addEventListener("click", () => {
+          if (!activeDealId) return;
+          moveDeal(activeDealId, btn.dataset.modalStage);
+          closeDealModal();
+        });
+      });
+      document.getElementById("deal-modal-backdrop").classList.add("open");
+      document.body.classList.add("drawer-open");
+    }
+
+    function closeDealModal() {
+      document.getElementById("deal-modal-backdrop").classList.remove("open");
+      document.body.classList.remove("drawer-open");
+      activeDealId = null;
+    }
+
+    function editDealFromModal() {
+      const deal = getDeal(activeDealId);
+      if (!deal) return;
+      const nextTitle = prompt("Название сделки", deal.title);
+      if (nextTitle == null) return;
+      const title = nextTitle.trim();
+      if (!title) {
+        toast("Название не может быть пустым");
+        return;
+      }
+      const nextAmount = prompt("Сумма сделки, ₽", String(deal.amount || 0));
+      if (nextAmount == null) return;
+      deal.title = title;
+      deal.amount = Number(nextAmount) || 0;
+      save();
+      renderFunnel();
+      closeDealModal();
+      toast("Сделка обновлена");
+    }
+
+    function deleteDealFromModal() {
+      if (!activeDealId) return;
+      data.deals = data.deals.filter(d => d.id !== activeDealId);
+      save();
+      renderFunnel();
+      closeDealModal();
+      toast("Сделка удалена");
     }
 
     function toast(msg, durationMs = 2200) {
@@ -1589,19 +1678,6 @@
       toast("Клиент удалён");
     }
 
-    function renderDealStageBar(currentStage, dealId) {
-      return STAGES.map((stage, idx) => {
-        const activeClass = stage.id === currentStage ? " is-active" : "";
-        const arrow = idx < STAGES.length - 1 ? '<span class="deal-stage-arrow">→</span>' : "";
-        return `
-          <button type="button" class="deal-stage-btn${activeClass}" data-stage="${stage.id}" data-deal-stage="${dealId}">
-            ${stage.label}
-          </button>
-          ${arrow}
-        `;
-      }).join("");
-    }
-
     function renderFunnel() {
       buildFunnelColumns();
       STAGES.forEach(({ id }) => {
@@ -1618,32 +1694,40 @@
           card.className = "deal-card";
           card.dataset.dealId = d.id;
           card.innerHTML = `
-            <div class="deal-stages">${renderDealStageBar(d.stage, d.id)}</div>
             <strong>${escapeHtml(d.title)}</strong>
             <span>${client ? escapeHtml(client.name) : "—"}</span>
             <div class="deal-amount">${formatMoney(Number(d.amount) || 0)}</div>
-            <button type="button" class="btn btn-ghost btn-sm" style="margin-top:0.35rem;width:100%" data-open-client="${d.clientId}">👤 Клиент</button>
-            <button type="button" class="btn btn-ghost btn-sm" style="margin-top:0.35rem;width:100%" data-delete-deal="${d.id}">Удалить</button>
+            <div class="deal-actions">
+              <button type="button" class="btn btn-ghost btn-sm" data-open-client="${d.clientId}">👤</button>
+              <button type="button" class="btn btn-ghost btn-sm" data-open-deal="${d.id}">✏</button>
+              <button type="button" class="btn btn-ghost btn-sm" data-delete-deal="${d.id}">🗑</button>
+            </div>
           `;
           container.appendChild(card);
         });
 
-        container.querySelectorAll("[data-deal-stage]").forEach(btn => {
-          btn.addEventListener("click", () => {
-            const stage = btn.dataset.stage;
-            const dealId = btn.dataset.dealStage;
-            if (!stage || !dealId) return;
-            moveDeal(dealId, stage);
+        container.querySelectorAll(".deal-card").forEach(card => {
+          card.addEventListener("click", e => {
+            if (e.target.closest("button")) return;
+            openDealModal(card.dataset.dealId);
           });
         });
         container.querySelectorAll("[data-open-client]").forEach(btn => {
-          btn.addEventListener("click", () => {
+          btn.addEventListener("click", e => {
+            e.stopPropagation();
             if (!btn.dataset.openClient) return;
             openDrawer(btn.dataset.openClient);
           });
         });
+        container.querySelectorAll("[data-open-deal]").forEach(btn => {
+          btn.addEventListener("click", e => {
+            e.stopPropagation();
+            openDealModal(btn.dataset.openDeal);
+          });
+        });
         container.querySelectorAll("[data-delete-deal]").forEach(btn => {
-          btn.addEventListener("click", () => {
+          btn.addEventListener("click", e => {
+            e.stopPropagation();
             data.deals = data.deals.filter(d => d.id !== btn.dataset.deleteDeal);
             save();
             renderFunnel();
@@ -1833,6 +1917,12 @@
     });
     document.getElementById("btn-add-stage").addEventListener("click", addStageDraft);
     document.getElementById("btn-save-stages").addEventListener("click", saveStagesDraft);
+    document.getElementById("deal-modal-close").addEventListener("click", closeDealModal);
+    document.getElementById("deal-modal-backdrop").addEventListener("click", e => {
+      if (e.target.id === "deal-modal-backdrop") closeDealModal();
+    });
+    document.getElementById("deal-modal-edit").addEventListener("click", editDealFromModal);
+    document.getElementById("deal-modal-delete").addEventListener("click", deleteDealFromModal);
 
     document.getElementById("drawer-close").addEventListener("click", closeDrawer);
     document.getElementById("drawer-backdrop").addEventListener("click", closeDrawer);
