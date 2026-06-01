@@ -1256,7 +1256,11 @@
         btn.addEventListener("click", () => {
           if (!activeDealId) return;
           moveDeal(activeDealId, btn.dataset.modalStage);
-          closeDealModal();
+          const updatedDeal = getDeal(activeDealId);
+          if (!updatedDeal) return;
+          document.querySelectorAll("[data-modal-stage]").forEach(stageBtn => {
+            stageBtn.classList.toggle("is-active", stageBtn.dataset.modalStage === updatedDeal.stage);
+          });
         });
       });
       document.getElementById("deal-modal-backdrop").classList.add("open");
