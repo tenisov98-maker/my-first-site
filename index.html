@@ -367,7 +367,7 @@
 
     .stage-editor-row {
       display: grid;
-      grid-template-columns: auto 1fr auto;
+      grid-template-columns: auto auto 1fr auto;
       gap: 0.5rem;
       align-items: center;
       border: 1px solid var(--border);
@@ -375,6 +375,21 @@
       padding: 0.5rem 0.6rem;
       background: #f8fafc;
     }
+
+    .stage-drag-handle {
+      width: 1.4rem;
+      height: 1.4rem;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      color: #64748b;
+      cursor: grab;
+      user-select: none;
+      font-size: 0.95rem;
+      border-radius: 4px;
+    }
+
+    .stage-drag-handle:hover { background: #e2e8f0; }
 
     .stage-editor-order {
       font-size: 0.75rem;
@@ -388,6 +403,8 @@
       width: 100%;
       padding: 0.45rem 0.6rem;
     }
+
+    .stage-editor-row.sortable-ghost { opacity: 0.35; }
 
     .deal-stages {
       display: flex;
@@ -1010,6 +1027,7 @@
     let drawerClientId = null;
     let editMode = false;
     let stagesDraft = [];
+    let stagesSortable = null;
 
     function uid() {
       return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
@@ -1095,11 +1113,16 @@
     function openStagesModal() {
       stagesDraft = STAGES.map(s => ({ ...s }));
       renderStagesDraft();
+      initStagesSortable();
       document.getElementById("stages-modal-backdrop").classList.add("open");
       document.body.classList.add("drawer-open");
     }
 
     function closeStagesModal() {
+      if (stagesSortable) {
+        stagesSortable.destroy();
+        stagesSortable = null;
+      }
       document.getElementById("stages-modal-backdrop").classList.remove("open");
       document.body.classList.remove("drawer-open");
     }
@@ -1107,7 +1130,8 @@
     function renderStagesDraft() {
       const list = document.getElementById("stages-editor-list");
       list.innerHTML = stagesDraft.map((stage, index) => `
-        <div class="stage-editor-row">
+        <div class="stage-editor-row" data-stage-row="${stage.id}">
+          <div class="stage-drag-handle" title="Перетащите для смены порядка">⠿</div>
           <div class="stage-editor-order">${index + 1}</div>
           <input type="text" value="${escapeHtml(stage.label)}" data-stage-label="${stage.id}" placeholder="Название этапа">
           <button type="button" class="btn btn-danger btn-sm" data-delete-stage="${stage.id}">Удалить</button>
@@ -1136,13 +1160,35 @@
           }
           stagesDraft = stagesDraft.filter(s => s.id !== stageId);
           renderStagesDraft();
+          initStagesSortable();
         });
+      });
+    }
+
+    function initStagesSortable() {
+      const list = document.getElementById("stages-editor-list");
+      if (!list) return;
+      if (stagesSortable) stagesSortable.destroy();
+      stagesSortable = new Sortable(list, {
+        animation: 150,
+        handle: ".stage-drag-handle",
+        draggable: ".stage-editor-row",
+        ghostClass: "sortable-ghost",
+        onEnd: () => {
+          const order = Array.from(list.querySelectorAll("[data-stage-row]")).map(el => el.dataset.stageRow);
+          stagesDraft = order
+            .map(id => stagesDraft.find(s => s.id === id))
+            .filter(Boolean);
+          renderStagesDraft();
+          initStagesSortable();
+        }
       });
     }
 
     function addStageDraft() {
       stagesDraft.push({ id: uid(), label: "Новый этап" });
       renderStagesDraft();
+      initStagesSortable();
     }
 
     function saveStagesDraft() {
