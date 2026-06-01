@@ -262,14 +262,10 @@
 
     .funnel {
       display: grid;
-      grid-template-columns: repeat(5, 1fr);
+      grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
       gap: 0.75rem;
       min-height: 320px;
     }
-
-    @media (max-width: 1100px) { .funnel { grid-template-columns: repeat(3, 1fr); } }
-    @media (max-width: 700px) { .funnel { grid-template-columns: 1fr 1fr; } }
-    @media (max-width: 440px) { .funnel { grid-template-columns: 1fr; } }
 
     .funnel-col {
       background: #f8fafc;
@@ -310,6 +306,87 @@
       background: #fff5f5;
       border-color: #fecaca;
       opacity: 0.8;
+    }
+
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 39, 68, 0.45);
+      z-index: 260;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+    }
+
+    .modal-backdrop.open { display: flex; }
+
+    .modal-card {
+      width: min(720px, 100%);
+      max-height: 85vh;
+      overflow: hidden;
+      background: #fff;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      box-shadow: 0 16px 50px rgba(15, 39, 68, 0.25);
+      display: flex;
+      flex-direction: column;
+    }
+
+    .modal-header,
+    .modal-footer {
+      padding: 1rem 1.1rem;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.75rem;
+    }
+
+    .modal-footer {
+      border-bottom: none;
+      border-top: 1px solid var(--border);
+      justify-content: flex-end;
+    }
+
+    .modal-header h3 { font-size: 1rem; font-weight: 600; }
+
+    .modal-body {
+      padding: 1rem 1.1rem;
+      overflow: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 0.8rem;
+    }
+
+    .stages-editor-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.55rem;
+    }
+
+    .stage-editor-row {
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      gap: 0.5rem;
+      align-items: center;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0.5rem 0.6rem;
+      background: #f8fafc;
+    }
+
+    .stage-editor-order {
+      font-size: 0.75rem;
+      color: var(--muted);
+      min-width: 1.6rem;
+      text-align: center;
+      font-weight: 600;
+    }
+
+    .stage-editor-row input {
+      width: 100%;
+      padding: 0.45rem 0.6rem;
     }
 
     .deal-stages {
@@ -745,7 +822,10 @@
 
     <section class="panel" id="panel-funnel">
       <div class="card">
-        <h2 class="card-title">Новая сделка</h2>
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:0.75rem;flex-wrap:wrap;margin-bottom:1rem;">
+          <h2 class="card-title" style="margin-bottom:0;">Новая сделка</h2>
+          <button type="button" class="btn btn-ghost btn-sm" id="btn-config-stages">⚙️ Настроить этапы</button>
+        </div>
         <form id="deal-form" class="toolbar">
           <div class="field" style="flex: 2;">
             <label for="deal-title">Название</label>
@@ -763,28 +843,7 @@
         </form>
       </div>
 
-      <div class="funnel" id="funnel">
-        <div class="funnel-col" data-stage="lead">
-          <h3>Лид</h3>
-          <div class="deals" data-stage="lead"></div>
-        </div>
-        <div class="funnel-col" data-stage="contact">
-          <h3>Контакт</h3>
-          <div class="deals" data-stage="contact"></div>
-        </div>
-        <div class="funnel-col" data-stage="proposal">
-          <h3>Предложение</h3>
-          <div class="deals" data-stage="proposal"></div>
-        </div>
-        <div class="funnel-col" data-stage="won">
-          <h3>Выигран</h3>
-          <div class="deals" data-stage="won"></div>
-        </div>
-        <div class="funnel-col" data-stage="lost">
-          <h3>Проигран</h3>
-          <div class="deals" data-stage="lost"></div>
-        </div>
-      </div>
+      <div class="funnel" id="funnel"></div>
     </section>
   </main>
 
@@ -916,15 +975,33 @@
 
   <div class="toast" id="toast"></div>
 
+  <div class="modal-backdrop" id="stages-modal-backdrop" aria-hidden="true">
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="stages-modal-title">
+      <div class="modal-header">
+        <h3 id="stages-modal-title">Настройка этапов воронки</h3>
+        <button type="button" class="drawer-close" id="stages-modal-close" aria-label="Закрыть">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="stages-editor-list" id="stages-editor-list"></div>
+        <button type="button" class="btn btn-ghost btn-sm" id="btn-add-stage">Добавить этап</button>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-primary" id="btn-save-stages">Сохранить</button>
+      </div>
+    </div>
+  </div>
+
   <script>
     const STORAGE_KEY = "crm-data-v2";
-    const STAGES = [
+    const STAGES_STORAGE_KEY = "crm-funnel-stages-v1";
+    const DEFAULT_STAGES = [
       { id: "lead", label: "Лид" },
       { id: "contact", label: "Контакт" },
       { id: "proposal", label: "Предложение" },
       { id: "won", label: "Выигран" },
       { id: "lost", label: "Проигран" }
     ];
+    let STAGES = [];
     const STATUS_LABELS = { new: "Новый", active: "Активный", done: "Завершён" };
     const STATUS_CLASS = { new: "badge-new", active: "badge-active", done: "badge-done" };
     const STATUS_ORDER = { new: 0, active: 1, done: 2 };
@@ -932,9 +1009,35 @@
     let data = { clients: [], deals: [] };
     let drawerClientId = null;
     let editMode = false;
+    let stagesDraft = [];
 
     function uid() {
       return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+    }
+
+    function loadStages() {
+      try {
+        const raw = localStorage.getItem(STAGES_STORAGE_KEY);
+        if (!raw) {
+          STAGES = DEFAULT_STAGES.map(s => ({ ...s }));
+          return;
+        }
+        const parsed = JSON.parse(raw);
+        if (!Array.isArray(parsed) || !parsed.length) {
+          STAGES = DEFAULT_STAGES.map(s => ({ ...s }));
+          return;
+        }
+        STAGES = parsed
+          .filter(s => s && typeof s.id === "string" && typeof s.label === "string")
+          .map(s => ({ id: s.id, label: s.label }));
+        if (!STAGES.length) STAGES = DEFAULT_STAGES.map(s => ({ ...s }));
+      } catch (_) {
+        STAGES = DEFAULT_STAGES.map(s => ({ ...s }));
+      }
+    }
+
+    function saveStages() {
+      localStorage.setItem(STAGES_STORAGE_KEY, JSON.stringify(STAGES));
     }
 
     function migrateClients() {
@@ -955,7 +1058,7 @@
         delete c.notes;
       });
       data.deals.forEach(d => {
-        if (!STAGES.find(s => s.id === d.stage)) d.stage = "lead";
+        if (!STAGES.find(s => s.id === d.stage)) d.stage = STAGES[0]?.id || "lead";
       });
     }
 
@@ -977,6 +1080,87 @@
 
     function save() {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    }
+
+    function buildFunnelColumns() {
+      const funnel = document.getElementById("funnel");
+      funnel.innerHTML = STAGES.map(stage => `
+        <div class="funnel-col" data-stage="${stage.id}">
+          <h3>${escapeHtml(stage.label)}</h3>
+          <div class="deals" data-stage="${stage.id}"></div>
+        </div>
+      `).join("");
+    }
+
+    function openStagesModal() {
+      stagesDraft = STAGES.map(s => ({ ...s }));
+      renderStagesDraft();
+      document.getElementById("stages-modal-backdrop").classList.add("open");
+      document.body.classList.add("drawer-open");
+    }
+
+    function closeStagesModal() {
+      document.getElementById("stages-modal-backdrop").classList.remove("open");
+      document.body.classList.remove("drawer-open");
+    }
+
+    function renderStagesDraft() {
+      const list = document.getElementById("stages-editor-list");
+      list.innerHTML = stagesDraft.map((stage, index) => `
+        <div class="stage-editor-row">
+          <div class="stage-editor-order">${index + 1}</div>
+          <input type="text" value="${escapeHtml(stage.label)}" data-stage-label="${stage.id}" placeholder="Название этапа">
+          <button type="button" class="btn btn-danger btn-sm" data-delete-stage="${stage.id}">Удалить</button>
+        </div>
+      `).join("");
+
+      list.querySelectorAll("[data-stage-label]").forEach(input => {
+        input.addEventListener("input", () => {
+          const item = stagesDraft.find(s => s.id === input.dataset.stageLabel);
+          if (!item) return;
+          item.label = input.value;
+        });
+      });
+
+      list.querySelectorAll("[data-delete-stage]").forEach(btn => {
+        btn.addEventListener("click", () => {
+          const stageId = btn.dataset.deleteStage;
+          const hasDeals = data.deals.some(d => d.stage === stageId);
+          if (hasDeals) {
+            toast("Нельзя удалить этап: в нём есть сделки");
+            return;
+          }
+          if (stagesDraft.length <= 1) {
+            toast("Должен остаться хотя бы один этап");
+            return;
+          }
+          stagesDraft = stagesDraft.filter(s => s.id !== stageId);
+          renderStagesDraft();
+        });
+      });
+    }
+
+    function addStageDraft() {
+      stagesDraft.push({ id: uid(), label: "Новый этап" });
+      renderStagesDraft();
+    }
+
+    function saveStagesDraft() {
+      const normalized = stagesDraft
+        .map(s => ({ id: s.id, label: (s.label || "").trim() }))
+        .filter(s => s.label);
+      if (!normalized.length) {
+        toast("Добавьте хотя бы один этап");
+        return;
+      }
+      STAGES = normalized;
+      saveStages();
+      migrateClients();
+      save();
+      closeStagesModal();
+      buildFunnelColumns();
+      renderFunnel();
+      toast("Этапы сохранены");
     }
 
     function toast(msg, durationMs = 2200) {
@@ -1373,6 +1557,7 @@
     }
 
     function renderFunnel() {
+      buildFunnelColumns();
       STAGES.forEach(({ id }) => {
         const container = document.querySelector(`.deals[data-stage="${id}"]`);
         const deals = data.deals.filter(d => d.stage === id);
@@ -1595,6 +1780,13 @@
     // Экспорт CSV
     document.getElementById("btn-export-csv").addEventListener("click", exportCSV);
     document.getElementById("btn-copy-client-card").addEventListener("click", copyClientCard);
+    document.getElementById("btn-config-stages").addEventListener("click", openStagesModal);
+    document.getElementById("stages-modal-close").addEventListener("click", closeStagesModal);
+    document.getElementById("stages-modal-backdrop").addEventListener("click", e => {
+      if (e.target.id === "stages-modal-backdrop") closeStagesModal();
+    });
+    document.getElementById("btn-add-stage").addEventListener("click", addStageDraft);
+    document.getElementById("btn-save-stages").addEventListener("click", saveStagesDraft);
 
     document.getElementById("drawer-close").addEventListener("click", closeDrawer);
     document.getElementById("drawer-backdrop").addEventListener("click", closeDrawer);
@@ -1618,6 +1810,7 @@
       });
     });
 
+    loadStages();
     load();
     renderClients();
     renderFunnel();
