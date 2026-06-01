@@ -312,23 +312,6 @@
       opacity: 0.8;
     }
 
-    .funnel-col.drag-over {
-      border-color: #60a5fa;
-      box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.25);
-      background: #eff6ff;
-    }
-
-    .deal-card.sortable-chosen {
-      opacity: 0.7;
-      box-shadow: 0 12px 28px rgba(37, 99, 235, 0.25);
-      transform: translateY(-2px);
-      cursor: grabbing;
-    }
-
-    .deal-card.sortable-ghost {
-      opacity: 0.35;
-    }
-
     .deal-card strong { font-size: 0.9rem; display: block; }
     .deal-card span { font-size: 0.75rem; color: var(--muted); }
     .deal-amount { font-weight: 700; color: var(--success); font-size: 0.85rem; margin-top: 0.35rem; }
@@ -897,7 +880,6 @@
 
   <div class="toast" id="toast"></div>
 
-  <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
   <script>
     const STORAGE_KEY = "crm-data-v2";
     const STAGES = [
@@ -914,16 +896,7 @@
     let data = { clients: [], deals: [] };
     let drawerClientId = null;
     let editMode = false;
-    let funnelSyncTimer = null;
-
-    function scheduleFunnelSync() {
-      if (funnelSyncTimer) clearTimeout(funnelSyncTimer);
-      funnelSyncTimer = setTimeout(() => {
-        save();
-        updateStats();
-        if (drawerClientId) renderClientDeals();
-      }, 300);
-    }
+    let draggedDealId = null;
 
     function uid() {
       return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
@@ -1019,8 +992,6 @@
     function getClient(id) {
       return data.clients.find(c => c.id === id);
     }
-
-    let funnelSortables = [];
 
     function hasValue(v) {
       return v !== null && v !== undefined && String(v).trim() !== "";
@@ -1353,94 +1324,35 @@
       toast("Клиент удалён");
     }
 
-    function clearFunnelHighlights() {
-      document.querySelectorAll(".funnel-col.drag-over").forEach(col => col.classList.remove("drag-over"));
-    }
-
-    function initFunnelSortable() {
-      funnelSortables.forEach(s => s.destroy());
-      funnelSortables = [];
-
-      document.querySelectorAll(".deals[data-stage]").forEach(container => {
-        const sortable = new Sortable(container, {
-          group: "deals",
-          animation: 150,
-          delay: 0,
-          delayOnTouchOnly: false,
-          forceFallback: false,
-          draggable: ".deal-card",
-          filter: "[data-drag-ignore]",
-          ghostClass: "sortable-ghost",
-          chosenClass: "sortable-chosen",
-          onStart: evt => {
-            clearFunnelHighlights();
-            const col = evt.from.closest(".funnel-col");
-            if (col) col.classList.add("drag-over");
-          },
-          onMove: evt => {
-            clearFunnelHighlights();
-            const col = evt.to.closest(".funnel-col");
-            if (col) col.classList.add("drag-over");
-            return true;
-          },
-          onEnd: evt => {
-            clearFunnelHighlights();
-            const item = evt.item;
-            if (!item) return;
-            const dealId = item.dataset.dealId;
-            const targetContainer = evt.to;
-            const sourceContainer = evt.from;
-            const targetStage = targetContainer?.dataset?.stage;
-            if (!dealId || !targetStage) return;
-
-            const deal = data.deals.find(d => d.id === dealId);
-            if (!deal) return;
-
-            const changedStage = deal.stage !== targetStage;
-            deal.stage = targetStage;
-            updateDealMoveOptions(item, targetStage);
-            syncFunnelEmptyState(sourceContainer);
-            syncFunnelEmptyState(targetContainer);
-            scheduleFunnelSync();
-            if (changedStage) {
-              const stageName = STAGES.find(s => s.id === targetStage)?.label || targetStage;
-              toast(`Сделка перемещена в «${stageName}»`);
-            }
-          },
-          onFilter: evt => {
-            evt.preventDefault();
-          }
-        });
-        funnelSortables.push(sortable);
-      });
-    }
-
-    function updateDealMoveOptions(card, stage) {
-      const sel = card.querySelector(".deal-move");
-      if (!sel) return;
-      const nextStages = STAGES.filter(s => s.id !== stage);
-      const options = nextStages.map(s => `<option value="${s.id}">${s.label}</option>`).join("");
-      sel.innerHTML = `
-        <option value="">Переместить →</option>
-        ${options}
-      `;
-      sel.value = "";
-    }
-
-    function syncFunnelEmptyState(container) {
-      if (!container) return;
-      const hasCards = container.querySelector(".deal-card");
-      const empty = container.querySelector(".empty");
-      if (hasCards && empty) {
-        empty.remove();
-      } else if (!hasCards && !empty) {
-        container.innerHTML = '<p class="empty" style="padding:0.5rem;">Пусто</p>';
+    function handleDealDragStart(e) {
+      draggedDealId = e.currentTarget.dataset.dealId;
+      if (e.dataTransfer) {
+        e.dataTransfer.setData("text/plain", draggedDealId);
+        e.dataTransfer.effectAllowed = "move";
       }
+    }
+
+    function handleFunnelDragOver(e) {
+      e.preventDefault();
+    }
+
+    function handleFunnelDrop(e) {
+      e.preventDefault();
+      const stage = e.currentTarget.dataset.stage;
+      const dealId = (e.dataTransfer && e.dataTransfer.getData("text/plain")) || draggedDealId;
+      if (!dealId || !stage) return;
+      const deal = data.deals.find(d => d.id === dealId);
+      if (!deal) return;
+      deal.stage = stage;
+      save();
+      renderFunnel();
     }
 
     function renderFunnel() {
       STAGES.forEach(({ id }) => {
         const container = document.querySelector(`.deals[data-stage="${id}"]`);
+        container.ondragover = handleFunnelDragOver;
+        container.ondrop = handleFunnelDrop;
         const deals = data.deals.filter(d => d.stage === id);
         container.innerHTML = "";
         if (!deals.length) {
@@ -1452,18 +1364,20 @@
           const card = document.createElement("div");
           card.className = "deal-card";
           card.dataset.dealId = d.id;
+          card.draggable = true;
+          card.ondragstart = handleDealDragStart;
           const nextStages = STAGES.filter(s => s.id !== id);
           const options = nextStages.map(s => `<option value="${s.id}">${s.label}</option>`).join("");
           card.innerHTML = `
             <strong>${escapeHtml(d.title)}</strong>
             <span>${client ? escapeHtml(client.name) : "—"}</span>
             <div class="deal-amount">${formatMoney(Number(d.amount) || 0)}</div>
-            <button type="button" class="btn btn-ghost btn-sm" style="margin-top:0.35rem;width:100%" data-drag-ignore="true" data-open-client="${d.clientId}">👤 Клиент</button>
-            <select class="deal-move" data-drag-ignore="true" data-deal="${d.id}">
+            <button type="button" class="btn btn-ghost btn-sm" style="margin-top:0.35rem;width:100%" ondragstart="event.stopPropagation()" data-open-client="${d.clientId}">👤 Клиент</button>
+            <select class="deal-move" ondragstart="event.stopPropagation()" data-deal="${d.id}">
               <option value="">Переместить →</option>
               ${options}
             </select>
-            <button type="button" class="btn btn-ghost btn-sm" style="margin-top:0.35rem;width:100%" data-drag-ignore="true" data-delete-deal="${d.id}">Удалить</button>
+            <button type="button" class="btn btn-ghost btn-sm" style="margin-top:0.35rem;width:100%" ondragstart="event.stopPropagation()" data-delete-deal="${d.id}">Удалить</button>
           `;
           container.appendChild(card);
         });
@@ -1493,7 +1407,6 @@
           });
         });
       });
-      initFunnelSortable();
       updateStats();
     }
 
@@ -1502,17 +1415,7 @@
       if (deal) {
         deal.stage = stage;
         save();
-        const card = document.querySelector(`.deal-card[data-deal-id="${id}"]`);
-        const targetContainer = document.querySelector(`.deals[data-stage="${stage}"]`);
-        if (card && targetContainer) {
-          const sourceContainer = card.parentElement;
-          const targetEmpty = targetContainer.querySelector(".empty");
-          if (targetEmpty) targetEmpty.remove();
-          targetContainer.appendChild(card);
-          updateDealMoveOptions(card, stage);
-          syncFunnelEmptyState(sourceContainer);
-          syncFunnelEmptyState(targetContainer);
-        }
+        renderFunnel();
         updateStats();
         if (drawerClientId) renderClientDeals();
         const stageName = STAGES.find(s => s.id === stage)?.label || stage;
