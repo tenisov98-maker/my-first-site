@@ -303,7 +303,7 @@
       padding: 0.65rem 0.75rem;
       margin-bottom: 0.5rem;
       box-shadow: 0 2px 8px rgba(0,0,0,0.04);
-      cursor: grab;
+      cursor: default;
     }
 
     .funnel-col[data-stage="lost"] .deal-card {
@@ -312,11 +312,47 @@
       opacity: 0.8;
     }
 
+    .deal-stages {
+      display: flex;
+      align-items: center;
+      gap: 0.25rem;
+      margin-bottom: 0.5rem;
+      flex-wrap: wrap;
+    }
+
+    .deal-stage-btn {
+      border: none;
+      background: #e5e7eb;
+      color: #475569;
+      border-radius: 999px;
+      font-size: 0.65rem;
+      font-weight: 600;
+      padding: 0.2rem 0.45rem;
+      cursor: pointer;
+      font-family: inherit;
+      line-height: 1.2;
+      transition: opacity 0.15s ease;
+    }
+
+    .deal-stage-btn:hover { opacity: 0.9; }
+    .deal-stage-btn.is-active { color: #fff; }
+    .deal-stage-btn[data-stage="lead"].is-active { background: #1d4ed8; }
+    .deal-stage-btn[data-stage="contact"].is-active { background: #b45309; }
+    .deal-stage-btn[data-stage="proposal"].is-active { background: #6d28d9; }
+    .deal-stage-btn[data-stage="won"].is-active { background: #15803d; }
+    .deal-stage-btn[data-stage="lost"].is-active { background: #b91c1c; }
+
+    .deal-stage-arrow {
+      color: #94a3b8;
+      font-size: 0.75rem;
+      line-height: 1;
+      user-select: none;
+    }
+
     .deal-card strong { font-size: 0.9rem; display: block; }
     .deal-card span { font-size: 0.75rem; color: var(--muted); }
     .deal-amount { font-weight: 700; color: var(--success); font-size: 0.85rem; margin-top: 0.35rem; }
     .funnel-col[data-stage="lost"] .deal-amount { color: var(--danger); }
-    .deal-move { margin-top: 0.5rem; width: 100%; font-size: 0.75rem; }
 
     .empty { font-size: 0.85rem; color: var(--muted); text-align: center; padding: 1.5rem; }
 
@@ -896,7 +932,6 @@
     let data = { clients: [], deals: [] };
     let drawerClientId = null;
     let editMode = false;
-    let draggedDealId = null;
 
     function uid() {
       return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
@@ -1324,35 +1359,22 @@
       toast("Клиент удалён");
     }
 
-    function handleDealDragStart(e) {
-      draggedDealId = e.currentTarget.dataset.dealId;
-      if (e.dataTransfer) {
-        e.dataTransfer.setData("text/plain", draggedDealId);
-        e.dataTransfer.effectAllowed = "move";
-      }
-    }
-
-    function handleFunnelDragOver(e) {
-      e.preventDefault();
-    }
-
-    function handleFunnelDrop(e) {
-      e.preventDefault();
-      const stage = e.currentTarget.dataset.stage;
-      const dealId = (e.dataTransfer && e.dataTransfer.getData("text/plain")) || draggedDealId;
-      if (!dealId || !stage) return;
-      const deal = data.deals.find(d => d.id === dealId);
-      if (!deal) return;
-      deal.stage = stage;
-      save();
-      renderFunnel();
+    function renderDealStageBar(currentStage, dealId) {
+      return STAGES.map((stage, idx) => {
+        const activeClass = stage.id === currentStage ? " is-active" : "";
+        const arrow = idx < STAGES.length - 1 ? '<span class="deal-stage-arrow">→</span>' : "";
+        return `
+          <button type="button" class="deal-stage-btn${activeClass}" data-stage="${stage.id}" data-deal-stage="${dealId}">
+            ${stage.label}
+          </button>
+          ${arrow}
+        `;
+      }).join("");
     }
 
     function renderFunnel() {
       STAGES.forEach(({ id }) => {
         const container = document.querySelector(`.deals[data-stage="${id}"]`);
-        container.ondragover = handleFunnelDragOver;
-        container.ondrop = handleFunnelDrop;
         const deals = data.deals.filter(d => d.stage === id);
         container.innerHTML = "";
         if (!deals.length) {
@@ -1364,30 +1386,23 @@
           const card = document.createElement("div");
           card.className = "deal-card";
           card.dataset.dealId = d.id;
-          card.draggable = true;
-          card.ondragstart = handleDealDragStart;
-          const nextStages = STAGES.filter(s => s.id !== id);
-          const options = nextStages.map(s => `<option value="${s.id}">${s.label}</option>`).join("");
           card.innerHTML = `
+            <div class="deal-stages">${renderDealStageBar(d.stage, d.id)}</div>
             <strong>${escapeHtml(d.title)}</strong>
             <span>${client ? escapeHtml(client.name) : "—"}</span>
             <div class="deal-amount">${formatMoney(Number(d.amount) || 0)}</div>
-            <button type="button" class="btn btn-ghost btn-sm" style="margin-top:0.35rem;width:100%" ondragstart="event.stopPropagation()" data-open-client="${d.clientId}">👤 Клиент</button>
-            <select class="deal-move" ondragstart="event.stopPropagation()" data-deal="${d.id}">
-              <option value="">Переместить →</option>
-              ${options}
-            </select>
-            <button type="button" class="btn btn-ghost btn-sm" style="margin-top:0.35rem;width:100%" ondragstart="event.stopPropagation()" data-delete-deal="${d.id}">Удалить</button>
+            <button type="button" class="btn btn-ghost btn-sm" style="margin-top:0.35rem;width:100%" data-open-client="${d.clientId}">👤 Клиент</button>
+            <button type="button" class="btn btn-ghost btn-sm" style="margin-top:0.35rem;width:100%" data-delete-deal="${d.id}">Удалить</button>
           `;
           container.appendChild(card);
         });
 
-        container.querySelectorAll(".deal-move").forEach(sel => {
-          sel.addEventListener("change", e => {
-            const stage = e.target.value;
-            if (!stage) return;
-            moveDeal(e.target.dataset.deal, stage);
-            e.target.value = "";
+        container.querySelectorAll("[data-deal-stage]").forEach(btn => {
+          btn.addEventListener("click", () => {
+            const stage = btn.dataset.stage;
+            const dealId = btn.dataset.dealStage;
+            if (!stage || !dealId) return;
+            moveDeal(dealId, stage);
           });
         });
         container.querySelectorAll("[data-open-client]").forEach(btn => {
